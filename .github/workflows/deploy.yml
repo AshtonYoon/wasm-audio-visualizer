@@ -47,6 +47,7 @@ jobs:
           emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
           emmake make -j$(nproc)
           cd ..
+          cmake --install build
           echo "✅ WASM build completed"
           ls -lh public/*.wasm public/*.js 2>/dev/null || echo "⚠️ WASM files not in public/"
 

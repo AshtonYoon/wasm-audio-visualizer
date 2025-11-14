@@ -61,3 +61,4 @@ set_target_properties(audio-visualizer PROPERTIES OUTPUT_NAME "audio-visualizer"
 install(TARGETS audio-visualizer DESTINATION ${CMAKE_SOURCE_DIR}/public)
 install(FILES ${CMAKE_BINARY_DIR}/audio-visualizer.wasm DESTINATION ${CMAKE_SOURCE_DIR}/public OPTIONAL)
 install(FILES ${CMAKE_BINARY_DIR}/audio-visualizer.js DESTINATION ${CMAKE_SOURCE_DIR}/public OPTIONAL)
+install(FILES ${CMAKE_BINARY_DIR}/audio-visualizer.wasm.map DESTINATION ${CMAKE_SOURCE_DIR}/public OPTIONAL)
