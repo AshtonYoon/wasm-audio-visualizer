@@ -1,0 +1,45 @@
+# Build outputs
+build/
+dist/
+public/*.wasm
+public/*.js
+public/*.wasm.map
+*.js.mem
+*.data
+*.worker.js
+
+# Dependencies
+node_modules/
+src/third_party/ffmpeg/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Emscripten
+.emscripten_cache/
+*.o
+*.a
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
