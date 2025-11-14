@@ -35,7 +35,7 @@ if(EMSCRIPTEN)
         "-s WASM=1"
         "-s MODULARIZE=1"
         "-s EXPORT_ES6=1"
-        "-s ENVIRONMENT=web"
+        "-s ENVIRONMENT=web,worker"
         "-s ALLOW_MEMORY_GROWTH=1"
         "-s INITIAL_MEMORY=134217728"
         "-s MAXIMUM_MEMORY=536870912"
