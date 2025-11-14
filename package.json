@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "description": "C++ WebAssembly based 3D audio visualizer",
   "type": "module",
+  "homepage": "https://ashtonyoon.github.io/wasm-audio-visualizer",
   "scripts": {
     "build:wasm": "./build.sh",
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "GITHUB_PAGES=true vite build",
     "preview": "vite preview",
+    "preview:gh": "vite preview --base /wasm-audio-visualizer/",
     "clean": "make -C build clean"
   },
   "keywords": [
