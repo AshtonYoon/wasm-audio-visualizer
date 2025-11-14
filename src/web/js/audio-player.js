@@ -6,7 +6,7 @@ export class AudioPlayer {
         this.audioBuffer = null;
         this.startTime = 0;
         this.pauseTime = 0;
-        this.isPlaying = false;
+        this._isPlaying = false;
         this.frequencyData = null;
     }
 
@@ -30,6 +30,25 @@ export class AudioPlayer {
         console.log(`Audio decoded: ${this.audioBuffer.duration.toFixed(2)}s`);
     }
 
+    async loadFromAudioBuffer(audioBuffer) {
+        this.audioBuffer = audioBuffer;
+
+        // Create audio context if not exists
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // Create analyser node
+        if (!this.analyser) {
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 2048;
+            this.analyser.connect(this.audioContext.destination);
+            this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+        }
+
+        console.log(`Audio loaded: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+    }
+
     play() {
         if (!this.audioBuffer) return;
 
@@ -47,23 +66,23 @@ export class AudioPlayer {
         const offset = this.pauseTime;
         this.source.start(0, offset);
         this.startTime = this.audioContext.currentTime - offset;
-        this.isPlaying = true;
+        this._isPlaying = true;
 
         // Handle end of playback
         this.source.onended = () => {
-            if (this.isPlaying) {
-                this.isPlaying = false;
+            if (this._isPlaying) {
+                this._isPlaying = false;
                 this.pauseTime = 0;
             }
         };
     }
 
     pause() {
-        if (!this.source || !this.isPlaying) return;
+        if (!this.source || !this._isPlaying) return;
 
         this.pauseTime = this.audioContext.currentTime - this.startTime;
         this.source.stop();
-        this.isPlaying = false;
+        this._isPlaying = false;
     }
 
     stop() {
@@ -71,7 +90,7 @@ export class AudioPlayer {
 
         this.source.stop();
         this.pauseTime = 0;
-        this.isPlaying = false;
+        this._isPlaying = false;
     }
 
     getFrequencyData() {
@@ -82,11 +101,11 @@ export class AudioPlayer {
     }
 
     isPlaying() {
-        return this.isPlaying;
+        return this._isPlaying;
     }
 
     getCurrentTime() {
-        if (!this.isPlaying) return this.pauseTime;
+        if (!this._isPlaying) return this.pauseTime;
         return this.audioContext.currentTime - this.startTime;
     }
 }

@@ -42,6 +42,23 @@ bool AudioDecoder::load(const uint8_t* data, size_t size) {
     return decode_wav(data, size);
 }
 
+void AudioDecoder::loadFromPCM(const float* samples, size_t num_samples,
+                                int sample_rate, int channels) {
+    // Clear existing data
+    samples_.clear();
+
+    // Set audio info
+    info_.sample_rate = sample_rate;
+    info_.channels = channels;
+    info_.duration_ms = (num_samples * 1000) / (sample_rate * channels);
+    info_.format = "PCM";
+
+    // Copy samples
+    samples_.assign(samples, samples + num_samples);
+
+    loaded_ = true;
+}
+
 bool AudioDecoder::decode_wav(const uint8_t* data, size_t size) {
     if (size < sizeof(WAVHeader)) {
         return false;

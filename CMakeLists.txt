@@ -41,8 +41,8 @@ if(EMSCRIPTEN)
         "-s MAXIMUM_MEMORY=536870912"
         "-pthread"
         "-s PTHREAD_POOL_SIZE=2"
-        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_getWaveformData','_getFFTData','_getSampleCount','_getSampleRate','_getChannels','_cleanup']"
-        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','HEAPF32']"
+        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_loadPCMData','_getWaveformData','_getFFTData','_getSampleCount','_getSampleRate','_getChannels','_cleanup']"
+        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','HEAP8','HEAPU8','HEAPF32','writeArrayToMemory']"
         "-gsource-map"
         "--source-map-base=http://localhost:8000/"
     )

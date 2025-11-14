@@ -60,29 +60,46 @@ class App {
 
         try {
             this.updateStatus(`Loading ${file.name}...`);
+            console.log(`Loading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
 
             // Read file as ArrayBuffer
             const arrayBuffer = await file.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
+            console.log(`ArrayBuffer loaded, size: ${arrayBuffer.byteLength} bytes`);
 
-            // Allocate memory in WASM
-            const dataPtr = this.wasmModule._malloc(uint8Array.length);
-            this.wasmModule.HEAPU8.set(uint8Array, dataPtr);
-
-            // Load audio in WASM
-            const success = this.wasmModule._loadAudio(dataPtr, uint8Array.length);
-            this.wasmModule._free(dataPtr);
-
-            if (!success) {
-                throw new Error('Failed to decode audio file. Only WAV format is currently supported.');
+            // Decode with Web Audio API (supports all formats)
+            if (!this.audioPlayer.audioContext) {
+                this.audioPlayer.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            // Get audio info
+            this.updateStatus(`Decoding ${file.name}...`);
+            console.log('Decoding with Web Audio API...');
+
+            let audioBuffer;
+            try {
+                audioBuffer = await this.audioPlayer.audioContext.decodeAudioData(arrayBuffer.slice(0));
+            } catch (decodeError) {
+                console.error('Web Audio API decode error:', decodeError);
+                throw new Error(`Failed to decode ${file.name}. Format may not be supported by your browser.`);
+            }
+
+            console.log(`✓ Decoded: ${file.name}, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+
+            // Load PCM data to WASM for visualization
+            this.updateStatus(`Loading to WASM...`);
+            const success = this.loadPCMToWasm(audioBuffer);
+
+            if (!success) {
+                throw new Error('Failed to load audio data to WASM visualization engine.');
+            }
+
+            console.log('✓ PCM data loaded to WASM');
+
+            // Get audio info from WASM
             const sampleCount = this.wasmModule._getSampleCount();
             const sampleRate = this.wasmModule._getSampleRate();
             const channels = this.wasmModule._getChannels();
 
-            console.log(`Audio loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
+            console.log(`WASM loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
 
             // Get waveform data for visualization
             const resolution = 1024;
@@ -90,19 +107,21 @@ class App {
 
             if (waveformPtr) {
                 // Copy waveform data from WASM memory
-                const waveformData = new Float32Array(
-                    this.wasmModule.HEAPF32.buffer,
-                    waveformPtr,
-                    resolution * 3  // x, y, z for each point
-                );
+                const numFloats = resolution * 3;  // x, y, z for each point
+                const offset = waveformPtr / 4;  // HEAPF32 is indexed in float units, not bytes
+                const waveformData = new Float32Array(numFloats);
+
+                // Copy from HEAPF32
+                for (let i = 0; i < numFloats; i++) {
+                    waveformData[i] = this.wasmModule.HEAPF32[offset + i];
+                }
 
                 // Update visualizer
                 this.visualizer.updateWaveform(waveformData, resolution);
             }
 
             // Load audio into Web Audio API for playback
-            // Note: We need to decode again for Web Audio API as WASM only stores samples
-            await this.audioPlayer.loadFile(arrayBuffer);
+            await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
 
             // Enable controls
             document.getElementById('play-btn').disabled = false;
@@ -114,6 +133,47 @@ class App {
         } catch (error) {
             console.error('Error loading file:', error);
             this.updateStatus(`Error: ${error.message}`);
+        }
+    }
+
+    loadPCMToWasm(audioBuffer) {
+        try {
+            console.log('Loading PCM to WASM...');
+
+            // Get channel data (use first channel for mono, or mix to mono)
+            const channelData = audioBuffer.getChannelData(0);
+            const numSamples = channelData.length;
+
+            console.log(`PCM data: ${numSamples} samples, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+
+            // Allocate memory in WASM for float32 array
+            const dataPtr = this.wasmModule._malloc(numSamples * 4); // 4 bytes per float
+            console.log(`Allocated ${numSamples * 4} bytes at pointer ${dataPtr}`);
+
+            // Copy PCM data to WASM memory
+            const offset = dataPtr / 4; // HEAPF32 is indexed in float units
+            for (let i = 0; i < numSamples; i++) {
+                this.wasmModule.HEAPF32[offset + i] = channelData[i];
+            }
+            console.log('PCM data copied to WASM memory');
+
+            // Call WASM function to load PCM data
+            const success = this.wasmModule._loadPCMData(
+                dataPtr,
+                numSamples,
+                audioBuffer.sampleRate,
+                audioBuffer.numberOfChannels
+            );
+
+            console.log(`WASM _loadPCMData returned: ${success}`);
+
+            // Free allocated memory
+            this.wasmModule._free(dataPtr);
+
+            return success === 1;
+        } catch (error) {
+            console.error('Error loading PCM to WASM:', error);
+            return false;
         }
     }
 

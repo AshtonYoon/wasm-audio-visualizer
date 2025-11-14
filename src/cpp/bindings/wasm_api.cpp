@@ -14,7 +14,7 @@ static std::unique_ptr<audio::WaveformGenerator> g_waveform_gen;
 extern "C" {
 
 /**
- * Load audio file from memory buffer
+ * Load audio file from memory buffer (WAV format)
  * Returns 1 on success, 0 on failure
  */
 EMSCRIPTEN_KEEPALIVE
@@ -37,6 +37,28 @@ int loadAudio(const uint8_t* data, size_t size) {
     }
 
     return success ? 1 : 0;
+}
+
+/**
+ * Load audio from already decoded PCM samples
+ * This allows any format to be decoded by Web Audio API first
+ * Returns 1 on success, 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+int loadPCMData(const float* samples, int num_samples, int sample_rate, int channels) {
+    if (!g_decoder) {
+        g_decoder = std::make_unique<audio::AudioDecoder>();
+    }
+
+    g_decoder->loadFromPCM(samples, num_samples, sample_rate, channels);
+
+    const auto& info = g_decoder->info();
+    printf("Loaded PCM audio: %d Hz, %d channels, %lld ms\n",
+           info.sample_rate,
+           info.channels,
+           info.duration_ms);
+
+    return 1;
 }
 
 /**

@@ -9,6 +9,8 @@ export class Visualizer3D {
         this.renderer = null;
         this.controls = null;
         this.waveformMesh = null;
+        this.spectrumBars = null;
+        this.spectrumGroup = null;
         this.colorScheme = 'purple';
         this.sensitivity = 1.0;
 
@@ -107,16 +109,100 @@ export class Visualizer3D {
 
         // Create line mesh
         this.waveformMesh = new THREE.LineSegments(geometry, material);
+
+        // Hide waveform (always use spectrum mode)
+        this.waveformMesh.visible = false;
+
         this.scene.add(this.waveformMesh);
     }
 
     updateFrequency(frequencyData) {
-        // Update waveform mesh based on real-time frequency data
-        // This can be used to animate the existing waveform
-        if (!this.waveformMesh) return;
+        if (!frequencyData) return;
 
-        // For now, we could add some subtle animation based on frequency
-        // This is placeholder for more advanced real-time visualization
+        // Create spectrum bars if they don't exist
+        if (!this.spectrumBars) {
+            this.createSpectrumBars();
+        }
+
+        // Update spectrum bars
+        const barCount = this.spectrumBars.length;
+        const dataPerBar = Math.floor(frequencyData.length / barCount);
+
+        this.spectrumBars.forEach((bar, i) => {
+            // Average frequency data for this bar
+            let sum = 0;
+            const startIdx = i * dataPerBar;
+            const endIdx = Math.min(startIdx + dataPerBar, frequencyData.length);
+
+            for (let j = startIdx; j < endIdx; j++) {
+                sum += frequencyData[j];
+            }
+
+            const average = sum / (endIdx - startIdx) / 255.0; // Normalize to 0-1
+
+            // Calculate target height with sensitivity
+            const targetHeight = average * 8 * this.sensitivity;
+
+            // Smooth transition (lerp)
+            const currentHeight = bar.scale.y;
+            bar.scale.y = currentHeight + (targetHeight - currentHeight) * 0.3;
+
+            // Update color based on height
+            const hue = this.getHueForBar(i, barCount, bar.scale.y / (8 * this.sensitivity));
+            bar.material.color.setHSL(hue, 0.8, 0.5);
+        });
+    }
+
+    createSpectrumBars() {
+        const barCount = 64;
+        const radius = 12;
+        this.spectrumBars = [];
+
+        // Create group for spectrum bars
+        this.spectrumGroup = new THREE.Group();
+
+        for (let i = 0; i < barCount; i++) {
+            // Create bar geometry
+            const geometry = new THREE.BoxGeometry(0.4, 1, 0.4);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x667eea,
+                shininess: 30,
+                emissive: 0x222222
+            });
+
+            const bar = new THREE.Mesh(geometry, material);
+
+            // Position in circle
+            const angle = (i / barCount) * Math.PI * 2;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+
+            bar.position.set(x, 0, z);
+            bar.rotation.y = -angle; // Face center
+
+            // Store initial scale
+            bar.scale.y = 0.1;
+
+            this.spectrumBars.push(bar);
+            this.spectrumGroup.add(bar);
+        }
+
+        this.scene.add(this.spectrumGroup);
+    }
+
+    getHueForBar(index, total, intensity) {
+        switch (this.colorScheme) {
+            case 'purple':
+                return 0.75 + (index / total) * 0.15 + intensity * 0.1;
+            case 'ocean':
+                return 0.55 + (index / total) * 0.15;
+            case 'fire':
+                return (index / total) * 0.15 + intensity * 0.1;
+            case 'rainbow':
+                return (index / total);
+            default:
+                return 0.75;
+        }
     }
 
     getColorForHeight(normalizedHeight) {
@@ -138,8 +224,14 @@ export class Visualizer3D {
 
     setColorScheme(scheme) {
         this.colorScheme = scheme;
-        // Re-render with new colors if waveform exists
-        // (would need to store waveformData to recompute)
+
+        // Update spectrum bars colors if they exist
+        if (this.spectrumBars) {
+            this.spectrumBars.forEach((bar, i) => {
+                const hue = this.getHueForBar(i, this.spectrumBars.length, 0.5);
+                bar.material.color.setHSL(hue, 0.8, 0.5);
+            });
+        }
     }
 
     setSensitivity(value) {

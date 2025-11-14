@@ -24,8 +24,12 @@ public:
     AudioDecoder();
     ~AudioDecoder();
 
-    // Load audio from memory buffer
+    // Load audio from memory buffer (WAV format)
     bool load(const uint8_t* data, size_t size);
+
+    // Load audio from already decoded PCM samples
+    void loadFromPCM(const float* samples, size_t num_samples,
+                     int sample_rate, int channels);
 
     // Get audio info
     const AudioInfo& info() const { return info_; }
