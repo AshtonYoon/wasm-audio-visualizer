@@ -223,37 +223,48 @@ class App {
         // Get FFT size from analyser (or use default)
         const fftSize = this.audioPlayer.analyser ? this.audioPlayer.analyser.fftSize : 2048;
 
-        // Call WASM FFT function
-        const fftPtr = this.wasmModule._getFFTDataAtOffset(sampleOffset, fftSize);
+        // Use batch FFT for better performance (reduce function call overhead)
+        const batchSize = 4; // Process 4 frames at once
+        const hopSize = Math.floor(fftSize / 4); // 75% overlap
 
-        if (!fftPtr) {
+        const batchPtr = this.wasmModule._getBatchFFTData(sampleOffset, batchSize, hopSize, fftSize);
+
+        if (!batchPtr) {
             // Fallback to Web Audio API if WASM FFT fails
             return this.audioPlayer.getFrequencyData();
         }
 
         // Copy FFT data from WASM memory
         const numBins = fftSize / 2;
-        const offset = fftPtr / 4; // HEAPF32 is indexed in float units
+        const offset = batchPtr / 4; // HEAPF32 is indexed in float units
 
         // Convert float magnitudes to Uint8Array (0-255) like Web Audio API
         if (!this.wasmFrequencyData || this.wasmFrequencyData.length !== numBins) {
             this.wasmFrequencyData = new Uint8Array(numBins);
         }
 
+        // Average the batch results for smoother visualization
+        const avgMagnitudes = new Float32Array(numBins);
+        for (let frame = 0; frame < batchSize; frame++) {
+            const frameOffset = offset + (frame * numBins);
+            for (let i = 0; i < numBins; i++) {
+                avgMagnitudes[i] += this.wasmModule.HEAPF32[frameOffset + i];
+            }
+        }
+
         // Find max magnitude for normalization
         let maxMagnitude = 0;
         for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
-            if (magnitude > maxMagnitude) {
-                maxMagnitude = magnitude;
+            avgMagnitudes[i] /= batchSize;
+            if (avgMagnitudes[i] > maxMagnitude) {
+                maxMagnitude = avgMagnitudes[i];
             }
         }
 
         // Normalize and convert to 0-255 range
         const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
         for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
-            this.wasmFrequencyData[i] = Math.min(255, Math.floor(magnitude * scale));
+            this.wasmFrequencyData[i] = Math.min(255, Math.floor(avgMagnitudes[i] * scale));
         }
 
         return this.wasmFrequencyData;

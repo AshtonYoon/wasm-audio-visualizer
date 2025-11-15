@@ -9,10 +9,8 @@ export class UIControls {
         const fftSizeSelect = document.getElementById('fft-size');
         fftSizeSelect.addEventListener('change', (e) => {
             const size = parseInt(e.target.value);
-            if (this.app.audioPlayer && this.app.audioPlayer.analyser) {
-                this.app.audioPlayer.analyser.fftSize = size;
-                this.app.audioPlayer.frequencyData = new Uint8Array(this.app.audioPlayer.analyser.frequencyBinCount);
-                console.log(`FFT size changed to: ${size}`);
+            if (this.app.audioPlayer) {
+                this.app.audioPlayer.setFFTSize(size);
             }
         });
 

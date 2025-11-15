@@ -108,4 +108,16 @@ export class AudioPlayer {
         if (!this._isPlaying) return this.pauseTime;
         return this.audioContext.currentTime - this.startTime;
     }
+
+    setFFTSize(fftSize) {
+        if (!this.analyser) return;
+
+        // Update FFT size
+        this.analyser.fftSize = fftSize;
+
+        // Recreate frequency data array with new bin count
+        this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+
+        console.log(`FFT size changed to ${fftSize} (${this.analyser.frequencyBinCount} bins)`);
+    }
 }
