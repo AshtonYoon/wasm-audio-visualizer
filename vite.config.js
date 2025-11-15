@@ -17,6 +17,10 @@ export default defineConfig({
         outDir: 'dist',
         assetsDir: 'assets',
         rollupOptions: {
+            input: {
+                main: path.resolve(__dirname, 'index.html'),
+                'pure-js': path.resolve(__dirname, 'pure-js.html'),
+            },
             output: {
                 // Ensure Service Worker is not hashed
                 assetFileNames: (assetInfo) => {
