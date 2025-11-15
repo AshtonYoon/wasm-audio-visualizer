@@ -1,28 +1,21 @@
-import WasmModule from '../../../public/audio-visualizer.js';
 import { AudioPlayer } from './audio-player.js';
 import { Visualizer3D } from './visualizer-3d.js';
 import { UIControls } from './ui-controls.js';
 import { PerformanceMonitor } from './performance-monitor.js';
 
-class App {
+class PureJSApp {
     constructor() {
-        this.wasmModule = null;
         this.audioPlayer = null;
         this.visualizer = null;
         this.uiControls = null;
         this.performanceMonitor = null;
-        this.audioData = null;
     }
 
     async init() {
         try {
             // Show loading
             document.getElementById('loading').classList.add('active');
-            this.updateStatus('Loading WASM module...');
-
-            // Load WASM module
-            this.wasmModule = await WasmModule();
-            console.log('WASM module loaded successfully');
+            this.updateStatus('Initializing Pure JavaScript visualizer...');
 
             // Initialize components
             this.audioPlayer = new AudioPlayer();
@@ -37,9 +30,11 @@ class App {
             document.getElementById('loading').classList.remove('active');
             this.updateStatus('Ready. Load an audio file to begin.');
 
+            console.log('Pure JavaScript visualizer initialized successfully');
+
         } catch (error) {
             console.error('Failed to initialize app:', error);
-            this.updateStatus('Error: Failed to load WASM module. Check console for details.');
+            this.updateStatus('Error: Failed to initialize visualizer. Check console for details.');
         }
     }
 
@@ -65,6 +60,8 @@ class App {
             this.updateStatus(`Loading ${file.name}...`);
             console.log(`Loading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
 
+            const loadStart = performance.now();
+
             // Read file as ArrayBuffer
             const arrayBuffer = await file.arrayBuffer();
             console.log(`ArrayBuffer loaded, size: ${arrayBuffer.byteLength} bytes`);
@@ -85,24 +82,16 @@ class App {
                 throw new Error(`Failed to decode ${file.name}. Format may not be supported by your browser.`);
             }
 
+            const loadTime = performance.now() - loadStart;
             console.log(`✓ Decoded: ${file.name}, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+            console.log(`Load time: ${loadTime.toFixed(2)}ms`);
 
-            // Load PCM data to WASM for visualization
-            this.updateStatus(`Loading to WASM...`);
-            const success = this.loadPCMToWasm(audioBuffer);
+            // Get audio info directly from AudioBuffer
+            const sampleCount = audioBuffer.length;
+            const sampleRate = audioBuffer.sampleRate;
+            const channels = audioBuffer.numberOfChannels;
 
-            if (!success) {
-                throw new Error('Failed to load audio data to WASM visualization engine.');
-            }
-
-            console.log('✓ PCM data loaded to WASM');
-
-            // Get audio info from WASM
-            const sampleCount = this.wasmModule._getSampleCount();
-            const sampleRate = this.wasmModule._getSampleRate();
-            const channels = this.wasmModule._getChannels();
-
-            console.log(`WASM loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
+            console.log(`Audio info: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
 
             // Load audio into Web Audio API for playback
             await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
@@ -112,52 +101,11 @@ class App {
             document.getElementById('pause-btn').disabled = false;
             document.getElementById('stop-btn').disabled = false;
 
-            this.updateStatus(`Loaded: ${file.name} (${sampleRate} Hz, ${channels}ch)`);
+            this.updateStatus(`Loaded: ${file.name} (${sampleRate} Hz, ${channels}ch, ${loadTime.toFixed(0)}ms)`);
 
         } catch (error) {
             console.error('Error loading file:', error);
             this.updateStatus(`Error: ${error.message}`);
-        }
-    }
-
-    loadPCMToWasm(audioBuffer) {
-        try {
-            console.log('Loading PCM to WASM...');
-
-            // Get channel data (use first channel for mono, or mix to mono)
-            const channelData = audioBuffer.getChannelData(0);
-            const numSamples = channelData.length;
-
-            console.log(`PCM data: ${numSamples} samples, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
-
-            // Allocate memory in WASM for float32 array
-            const dataPtr = this.wasmModule._malloc(numSamples * 4); // 4 bytes per float
-            console.log(`Allocated ${numSamples * 4} bytes at pointer ${dataPtr}`);
-
-            // Copy PCM data to WASM memory
-            const offset = dataPtr / 4; // HEAPF32 is indexed in float units
-            for (let i = 0; i < numSamples; i++) {
-                this.wasmModule.HEAPF32[offset + i] = channelData[i];
-            }
-            console.log('PCM data copied to WASM memory');
-
-            // Call WASM function to load PCM data
-            const success = this.wasmModule._loadPCMData(
-                dataPtr,
-                numSamples,
-                audioBuffer.sampleRate,
-                audioBuffer.numberOfChannels
-            );
-
-            console.log(`WASM _loadPCMData returned: ${success}`);
-
-            // Free allocated memory
-            this.wasmModule._free(dataPtr);
-
-            return success === 1;
-        } catch (error) {
-            console.error('Error loading PCM to WASM:', error);
-            return false;
         }
     }
 
@@ -198,65 +146,15 @@ class App {
         // Update visualization with current audio data if playing
         if (this.audioPlayer && this.audioPlayer.isPlaying()) {
             this.performanceMonitor.beginFFT();
-
-            // Use WASM FFT for spectrum analysis
-            const wasmFrequencyData = this.getWasmFrequencyData();
-
+            const analyzerData = this.audioPlayer.getFrequencyData();
             this.performanceMonitor.endFFT();
 
-            if (wasmFrequencyData && this.visualizer) {
-                this.visualizer.updateFrequency(wasmFrequencyData);
+            if (analyzerData && this.visualizer) {
+                this.visualizer.updateFrequency(analyzerData);
             }
         }
 
         this.performanceMonitor.endFrame();
-    }
-
-    getWasmFrequencyData() {
-        if (!this.wasmModule || !this.audioPlayer) return null;
-
-        // Get current playback time and convert to sample offset
-        const currentTime = this.audioPlayer.getCurrentTime();
-        const sampleRate = this.wasmModule._getSampleRate();
-        const sampleOffset = Math.floor(currentTime * sampleRate);
-
-        // Get FFT size from analyser (or use default)
-        const fftSize = this.audioPlayer.analyser ? this.audioPlayer.analyser.fftSize : 2048;
-
-        // Call WASM FFT function
-        const fftPtr = this.wasmModule._getFFTDataAtOffset(sampleOffset, fftSize);
-
-        if (!fftPtr) {
-            // Fallback to Web Audio API if WASM FFT fails
-            return this.audioPlayer.getFrequencyData();
-        }
-
-        // Copy FFT data from WASM memory
-        const numBins = fftSize / 2;
-        const offset = fftPtr / 4; // HEAPF32 is indexed in float units
-
-        // Convert float magnitudes to Uint8Array (0-255) like Web Audio API
-        if (!this.wasmFrequencyData || this.wasmFrequencyData.length !== numBins) {
-            this.wasmFrequencyData = new Uint8Array(numBins);
-        }
-
-        // Find max magnitude for normalization
-        let maxMagnitude = 0;
-        for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
-            if (magnitude > maxMagnitude) {
-                maxMagnitude = magnitude;
-            }
-        }
-
-        // Normalize and convert to 0-255 range
-        const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
-        for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
-            this.wasmFrequencyData[i] = Math.min(255, Math.floor(magnitude * scale));
-        }
-
-        return this.wasmFrequencyData;
     }
 
     updateStatus(message) {
@@ -267,10 +165,10 @@ class App {
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        const app = new App();
+        const app = new PureJSApp();
         app.init();
     });
 } else {
-    const app = new App();
+    const app = new PureJSApp();
     app.init();
 }
