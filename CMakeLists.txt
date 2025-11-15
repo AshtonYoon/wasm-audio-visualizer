@@ -14,7 +14,6 @@ set(SOURCES
     src/cpp/core/audio_decoder.cpp
     src/cpp/core/audio_analyzer.cpp
     src/cpp/core/audio_buffer.cpp
-    src/cpp/core/waveform_generator.cpp
     src/cpp/utils/memory_pool.cpp
     src/cpp/bindings/wasm_api.cpp
 )
@@ -39,7 +38,7 @@ if(EMSCRIPTEN)
         "-s ALLOW_MEMORY_GROWTH=1"
         "-s INITIAL_MEMORY=134217728"
         "-s MAXIMUM_MEMORY=536870912"
-        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_loadPCMData','_getWaveformData','_getFFTData','_getSampleCount','_getSampleRate','_getChannels','_cleanup']"
+        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_loadPCMData','_getFFTData','_getSampleCount','_getSampleRate','_getChannels','_cleanup']"
         "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','HEAP8','HEAPU8','HEAPF32','writeArrayToMemory']"
         "-gsource-map"
         "--source-map-base=http://localhost:8000/"

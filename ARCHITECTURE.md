@@ -24,12 +24,7 @@ flowchart TD
     CallWASM --> CPPDecoder[C++ AudioDecoder<br/>PCM 데이터 저장]
     CPPDecoder --> Free[WASM 메모리 해제<br/>free]
 
-    Free --> GetWaveform[WASM 함수 호출<br/>_getWaveformData]
-    GetWaveform --> CPPWaveform[C++ WaveformGenerator<br/>파형 정점 생성]
-    CPPWaveform --> CopyWaveform[JavaScript: HEAPF32에서<br/>파형 데이터 복사]
-    CopyWaveform --> ThreeJS1[Three.js: 파형 라인 렌더링]
-
-    AudioBuffer --> LoadPlayer[AudioPlayer에<br/>AudioBuffer 로드]
+    Free --> LoadPlayer[AudioPlayer에<br/>AudioBuffer 로드]
     LoadPlayer --> CreateAnalyser[AnalyserNode 생성<br/>FFT Size: 2048]
     CreateAnalyser --> Ready[준비 완료]
 
@@ -47,8 +42,6 @@ flowchart TD
     style End fill:#ffe1e1
     style WebAudio fill:#fff4e1
     style CPPDecoder fill:#e1ffe1
-    style CPPWaveform fill:#e1ffe1
-    style ThreeJS1 fill:#f0e1ff
     style Render fill:#f0e1ff
 ```
 
@@ -81,15 +74,7 @@ sequenceDiagram
     WASM-->>Main: success (1)
     Main->>WASM: _free(dataPtr)
 
-    Note over Main,WASM: 3단계: 파형 데이터 생성
-    Main->>WASM: _getWaveformData(1024)
-    WASM->>WASM: WaveformGenerator::generate()
-    WASM-->>Main: waveformPtr
-    Main->>WASM: HEAPF32에서 데이터 복사
-    Main->>Viz: updateWaveform(data, resolution)
-    Viz->>Viz: Three.js Line 업데이트
-
-    Note over Main,Player: 4단계: 재생 준비
+    Note over Main,Player: 3단계: 재생 준비
     Main->>Player: loadFromAudioBuffer(audioBuffer)
     Player->>Player: createAnalyser()<br/>fftSize = 2048
     Player-->>Main: 준비 완료
@@ -180,13 +165,12 @@ graph TB
 
     subgraph WASM["WebAssembly (C++)"]
         subgraph API["WASM Bindings"]
-            WasmAPI[wasm_api.cpp<br/>- loadPCMData<br/>- getWaveformData<br/>- getFFTData]
+            WasmAPI[wasm_api.cpp<br/>- loadPCMData<br/>- getFFTData]
         end
 
         subgraph Core["Core Components"]
             Decoder[AudioDecoder<br/>- WAV 디코더<br/>- PCM 저장]
             Analyzer[AudioAnalyzer<br/>- dj_fft<br/>- FFT 분석]
-            WaveGen[WaveformGenerator<br/>- 파형 정점 생성]
         end
 
         subgraph Lib["Third Party"]
@@ -209,11 +193,10 @@ graph TB
     AudioAPI --> Player
 
     Main -.->|PCM 데이터 전송| WasmAPI
-    WasmAPI -.->|파형/FFT 데이터| Main
+    WasmAPI -.->|FFT 데이터| Main
 
     WasmAPI --> Decoder
     WasmAPI --> Analyzer
-    WasmAPI --> WaveGen
 
     Analyzer --> DJFFT
 
@@ -251,12 +234,11 @@ flowchart LR
     subgraph WASMMem["WASM Memory (Linear Memory)"]
         HEAP[HEAPF32<br/>공유 메모리 영역]
         PCMData[vector&lt;float&gt;<br/>PCM 샘플]
-        WaveData[float*<br/>파형 정점<br/>x,y,z 배열]
         FFTData[float*<br/>FFT 결과<br/>magnitude 배열]
     end
 
     subgraph GPU["GPU Memory"]
-        VBO[Vertex Buffer<br/>파형/바 정점]
+        VBO[Vertex Buffer<br/>바 정점]
         Texture[텍스처<br/>머티리얼]
     end
 
@@ -264,15 +246,12 @@ flowchart LR
     AB -->|decodeAudioData| AudioBuf
     AudioBuf -->|복사| HEAP
     HEAP -->|loadPCMData| PCMData
-    PCMData -->|getWaveformData| WaveData
     PCMData -->|getFFTData| FFTData
-    WaveData -->|복사| HEAP
     FFTData -->|복사| HEAP
     HEAP -->|읽기| JSMem
 
     AudioBuf -->|AnalyserNode| FreqData
 
-    WaveData -.->|Three.js| VBO
     FreqData -.->|Three.js| VBO
     VBO --> GPU
 
@@ -289,8 +268,8 @@ flowchart LR
 | 기술 | 역할 | 주요 기능 |
 |------|------|-----------|
 | **Web Audio API** | 오디오 디코딩 & 분석 | - decodeAudioData: 모든 포맷 디코딩<br/>- AnalyserNode: 실시간 FFT<br/>- AudioContext: 오디오 재생 |
-| **WebAssembly (C++)** | 고성능 오디오 처리 | - PCM 데이터 저장<br/>- dj_fft를 이용한 FFT 분석<br/>- 파형 정점 생성 |
-| **Three.js** | 3D 시각화 | - BufferGeometry로 파형 렌더링<br/>- 64개 스펙트럼 바 (원형 배치)<br/>- OrbitControls로 카메라 제어 |
+| **WebAssembly (C++)** | 고성능 오디오 처리 | - PCM 데이터 저장<br/>- dj_fft를 이용한 FFT 분석 |
+| **Three.js** | 3D 시각화 | - 64개 스펙트럼 바 (원형 배치)<br/>- OrbitControls로 카메라 제어 |
 | **dj_fft** | SIMD 최적화 FFT | - WebAssembly SIMD 128 사용<br/>- 고속 주파수 분석 |
 | **Emscripten** | C++ → WASM 컴파일 | - pthread 지원 (멀티스레드)<br/>- ES6 모듈 생성<br/>- 메모리 관리 (malloc/free) |
 
@@ -341,15 +320,11 @@ flowchart TD
     Decode -->|성공| WasmLoad{WASM 로드}
 
     WasmLoad -->|실패| E3[Error: WASM 메모리<br/>할당 실패]
-    WasmLoad -->|성공| GetData{데이터 생성}
-
-    GetData -->|Waveform 실패| E4[Error: 파형 생성 실패]
-    GetData -->|성공| Success([로드 성공])
+    WasmLoad -->|성공| Success([로드 성공])
 
     E1 --> Display[상태 표시:<br/>콘솔 로그 + UI 메시지]
     E2 --> Display
     E3 --> Display
-    E4 --> Display
 
     Display --> Cleanup[리소스 정리]
     Cleanup --> End([종료])
@@ -359,7 +334,6 @@ flowchart TD
     style E1 fill:#ffcdd2
     style E2 fill:#ffcdd2
     style E3 fill:#ffcdd2
-    style E4 fill:#ffcdd2
     style Success fill:#c8e6c9
 ```
 
@@ -374,8 +348,7 @@ wasm-audio-visualizer/
 │   │   ├── core/               # 핵심 오디오 처리
 │   │   │   ├── audio_decoder.cpp      # PCM/WAV 디코더
 │   │   │   ├── audio_analyzer.cpp     # FFT 분석 (dj_fft)
-│   │   │   ├── audio_buffer.cpp       # 오디오 버퍼 관리
-│   │   │   └── waveform_generator.cpp # 파형 정점 생성
+│   │   │   └── audio_buffer.cpp       # 오디오 버퍼 관리
 │   │   ├── bindings/           # JavaScript ↔ C++ 바인딩
 │   │   │   └── wasm_api.cpp    # EMSCRIPTEN_KEEPALIVE 함수들
 │   │   └── third_party/
@@ -413,23 +386,18 @@ graph LR
 
     subgraph "WASM API (C++)"
         _loadPCMData[_loadPCMData]
-        _getWaveformData[_getWaveformData]
         _getFFTData[_getFFTData]
         _getSampleCount[_getSampleCount]
     end
 
     subgraph "C++ Core"
         loadFromPCM[AudioDecoder::loadFromPCM]
-        generate[WaveformGenerator::generate]
         analyze[AudioAnalyzer::analyze]
     end
 
     handleFileSelect --> loadPCMToWasm
     loadPCMToWasm --> _loadPCMData
     _loadPCMData --> loadFromPCM
-
-    handleFileSelect --> _getWaveformData
-    _getWaveformData --> generate
 
     play --> animate
     animate --> _getFFTData

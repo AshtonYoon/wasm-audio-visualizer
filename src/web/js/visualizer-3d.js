@@ -8,7 +8,6 @@ export class Visualizer3D {
         this.camera = null;
         this.renderer = null;
         this.controls = null;
-        this.waveformMesh = null;
         this.spectrumBars = null;
         this.spectrumGroup = null;
         this.colorScheme = 'purple';
@@ -59,61 +58,6 @@ export class Visualizer3D {
 
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize());
-    }
-
-    updateWaveform(waveformData, resolution) {
-        // Remove old mesh
-        if (this.waveformMesh) {
-            this.scene.remove(this.waveformMesh);
-            this.waveformMesh.geometry.dispose();
-            this.waveformMesh.material.dispose();
-        }
-
-        // Create geometry from waveform data
-        const geometry = new THREE.BufferGeometry();
-        const positions = [];
-        const colors = [];
-
-        // Create 3D waveform surface
-        const width = 20;
-        const depth = 30;
-        const heightScale = 10;
-
-        for (let i = 0; i < resolution - 1; i++) {
-            const x1 = (waveformData[i * 3] - 0.5) * width;
-            const y1 = waveformData[i * 3 + 1] * heightScale * this.sensitivity;
-            const z1 = (i / resolution - 0.5) * depth;
-
-            const x2 = (waveformData[(i + 1) * 3] - 0.5) * width;
-            const y2 = waveformData[(i + 1) * 3 + 1] * heightScale * this.sensitivity;
-            const z2 = ((i + 1) / resolution - 0.5) * depth;
-
-            // Create line segment
-            positions.push(x1, y1, z1);
-            positions.push(x2, y2, z2);
-
-            // Add colors based on height
-            const color = this.getColorForHeight(y1 / (heightScale * this.sensitivity));
-            colors.push(color.r, color.g, color.b);
-            colors.push(color.r, color.g, color.b);
-        }
-
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-        // Create material
-        const material = new THREE.LineBasicMaterial({
-            vertexColors: true,
-            linewidth: 2
-        });
-
-        // Create line mesh
-        this.waveformMesh = new THREE.LineSegments(geometry, material);
-
-        // Hide waveform (always use spectrum mode)
-        this.waveformMesh.visible = false;
-
-        this.scene.add(this.waveformMesh);
     }
 
     updateFrequency(frequencyData) {
@@ -202,23 +146,6 @@ export class Visualizer3D {
                 return (index / total);
             default:
                 return 0.75;
-        }
-    }
-
-    getColorForHeight(normalizedHeight) {
-        const h = Math.max(0, Math.min(1, normalizedHeight));
-
-        switch (this.colorScheme) {
-            case 'purple':
-                return new THREE.Color().setHSL(0.75 + h * 0.1, 0.8, 0.5 + h * 0.3);
-            case 'ocean':
-                return new THREE.Color().setHSL(0.55 + h * 0.1, 0.7, 0.4 + h * 0.4);
-            case 'fire':
-                return new THREE.Color().setHSL(h * 0.15, 1.0, 0.5);
-            case 'rainbow':
-                return new THREE.Color().setHSL(h, 0.8, 0.5);
-            default:
-                return new THREE.Color().setHSL(0.75, 0.8, 0.5 + h * 0.3);
         }
     }
 

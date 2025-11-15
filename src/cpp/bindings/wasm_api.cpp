@@ -4,12 +4,10 @@
 #include <memory>
 #include "audio_decoder.h"
 #include "audio_analyzer.h"
-#include "waveform_generator.h"
 
 // Global state
 static std::unique_ptr<audio::AudioDecoder> g_decoder;
 static std::unique_ptr<audio::AudioAnalyzer> g_analyzer;
-static std::unique_ptr<audio::WaveformGenerator> g_waveform_gen;
 
 extern "C" {
 
@@ -59,30 +57,6 @@ int loadPCMData(const float* samples, int num_samples, int sample_rate, int chan
            info.duration_ms);
 
     return 1;
-}
-
-/**
- * Get waveform data for visualization
- * @param resolution Number of points to generate
- * @return Pointer to vertex data (x, y, z triplets)
- */
-EMSCRIPTEN_KEEPALIVE
-const float* getWaveformData(int resolution) {
-    if (!g_decoder || !g_decoder->is_loaded()) {
-        return nullptr;
-    }
-
-    if (!g_waveform_gen) {
-        g_waveform_gen = std::make_unique<audio::WaveformGenerator>();
-    }
-
-    const auto& samples = g_decoder->samples();
-    return g_waveform_gen->generate(
-        samples.data(),
-        samples.size(),
-        resolution,
-        0.0f  // time_window_ms (unused for now)
-    );
 }
 
 /**
@@ -150,7 +124,6 @@ EMSCRIPTEN_KEEPALIVE
 void cleanup() {
     g_decoder.reset();
     g_analyzer.reset();
-    g_waveform_gen.reset();
     printf("Cleaned up WASM resources\n");
 }
 

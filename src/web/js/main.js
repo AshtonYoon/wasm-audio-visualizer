@@ -101,25 +101,6 @@ class App {
 
             console.log(`WASM loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
 
-            // Get waveform data for visualization
-            const resolution = 1024;
-            const waveformPtr = this.wasmModule._getWaveformData(resolution);
-
-            if (waveformPtr) {
-                // Copy waveform data from WASM memory
-                const numFloats = resolution * 3;  // x, y, z for each point
-                const offset = waveformPtr / 4;  // HEAPF32 is indexed in float units, not bytes
-                const waveformData = new Float32Array(numFloats);
-
-                // Copy from HEAPF32
-                for (let i = 0; i < numFloats; i++) {
-                    waveformData[i] = this.wasmModule.HEAPF32[offset + i];
-                }
-
-                // Update visualizer
-                this.visualizer.updateWaveform(waveformData, resolution);
-            }
-
             // Load audio into Web Audio API for playback
             await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
 
