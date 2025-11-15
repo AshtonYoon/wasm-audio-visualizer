@@ -31,6 +31,8 @@ if(EMSCRIPTEN)
 
     # Emscripten link flags
     set(EMSCRIPTEN_LINK_FLAGS
+        "-O3"
+        "-msimd128"
         "-s WASM=1"
         "-s MODULARIZE=1"
         "-s EXPORT_ES6=1"
