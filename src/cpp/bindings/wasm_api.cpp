@@ -8,7 +8,6 @@
 // Global state
 static std::unique_ptr<audio::AudioDecoder> g_decoder;
 static std::unique_ptr<audio::AudioAnalyzer> g_analyzer;
-static std::vector<float> g_batch_fft_results; // For batch FFT results
 
 extern "C" {
 
@@ -152,88 +151,12 @@ int getChannels() {
 }
 
 /**
- * Get batch FFT spectrum data (multiple frames at once for reduced overhead)
- * @param start_offset Starting sample offset
- * @param num_frames Number of FFT frames to compute
- * @param hop_size Samples to skip between frames
- * @param fft_size FFT size (must be power of 2)
- * @return Pointer to batch results (num_frames * fft_size/2 floats)
- */
-EMSCRIPTEN_KEEPALIVE
-const float* getBatchFFTData(int start_offset, int num_frames, int hop_size, int fft_size) {
-    if (!g_decoder || !g_decoder->is_loaded()) {
-        return nullptr;
-    }
-
-    if (num_frames <= 0 || hop_size <= 0 || fft_size <= 0) {
-        return nullptr;
-    }
-
-    if (!g_analyzer) {
-        g_analyzer = std::make_unique<audio::AudioAnalyzer>(fft_size);
-    } else {
-        g_analyzer->set_fft_size(fft_size);
-    }
-
-    const auto& samples = g_decoder->samples();
-    const int num_bins = fft_size / 2;
-
-    // Resize result buffer
-    g_batch_fft_results.resize(num_frames * num_bins);
-
-    // Compute FFT for each frame
-    for (int frame = 0; frame < num_frames; ++frame) {
-        int sample_offset = start_offset + (frame * hop_size);
-
-        // Check bounds
-        if (sample_offset < 0 || sample_offset >= static_cast<int>(samples.size())) {
-            // Fill with zeros for out-of-bounds frames
-            for (int i = 0; i < num_bins; ++i) {
-                g_batch_fft_results[frame * num_bins + i] = 0.0f;
-            }
-            continue;
-        }
-
-        size_t samples_available = samples.size() - sample_offset;
-        if (samples_available < static_cast<size_t>(fft_size)) {
-            // Not enough samples, fill with zeros
-            for (int i = 0; i < num_bins; ++i) {
-                g_batch_fft_results[frame * num_bins + i] = 0.0f;
-            }
-            continue;
-        }
-
-        // Compute FFT
-        const float* fft_result = g_analyzer->analyze(samples.data() + sample_offset, samples_available);
-
-        // Copy results
-        for (int i = 0; i < num_bins; ++i) {
-            g_batch_fft_results[frame * num_bins + i] = fft_result[i];
-        }
-    }
-
-    return g_batch_fft_results.data();
-}
-
-/**
- * Get the size of batch FFT results (for memory allocation check)
- * @param num_frames Number of frames
- * @param fft_size FFT size
- * @return Number of floats in result
- */
-EMSCRIPTEN_KEEPALIVE
-int getBatchFFTResultSize(int num_frames, int fft_size) {
-    return num_frames * (fft_size / 2);
-}
-
-/**
  * Cleanup resources
  */
 EMSCRIPTEN_KEEPALIVE
 void cleanup() {
     g_decoder.reset();
     g_analyzer.reset();
-    g_batch_fft_results.clear();
     printf("Cleaned up WASM resources\n");
 }
 
