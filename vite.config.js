@@ -20,6 +20,7 @@ export default defineConfig({
             input: {
                 main: path.resolve(__dirname, 'index.html'),
                 'pure-js': path.resolve(__dirname, 'pure-js.html'),
+                'pure-js-fft': path.resolve(__dirname, 'pure-js-fft.html'),
             },
             output: {
                 // Ensure Service Worker is not hashed

@@ -12,6 +12,23 @@ class App {
         this.uiControls = null;
         this.performanceMonitor = null;
         this.audioData = null;
+
+        // Performance optimization: Pre-allocated buffers (zero-copy design)
+        this.wasmFrequencyData = null;
+        this.avgMagnitudesBuffer = null;
+        this.currentFFTSize = 0;
+
+        // Cache WASM function references to avoid lookup overhead
+        this.wasmFunctions = {
+            getSampleCount: null,
+            getSampleRate: null,
+            getChannels: null,
+            getBatchFFTData: null,
+            getFFTDataAtOffset: null,
+            malloc: null,
+            free: null,
+            loadPCMData: null
+        };
     }
 
     async init() {
@@ -23,6 +40,9 @@ class App {
             // Load WASM module
             this.wasmModule = await WasmModule();
             console.log('WASM module loaded successfully');
+
+            // Cache WASM function references for performance
+            this.cacheWasmFunctions();
 
             // Initialize components
             this.audioPlayer = new AudioPlayer();
@@ -41,6 +61,18 @@ class App {
             console.error('Failed to initialize app:', error);
             this.updateStatus('Error: Failed to load WASM module. Check console for details.');
         }
+    }
+
+    cacheWasmFunctions() {
+        // Cache frequently used WASM function references to avoid lookup overhead
+        this.wasmFunctions.getSampleCount = this.wasmModule._getSampleCount;
+        this.wasmFunctions.getSampleRate = this.wasmModule._getSampleRate;
+        this.wasmFunctions.getChannels = this.wasmModule._getChannels;
+        this.wasmFunctions.getBatchFFTData = this.wasmModule._getBatchFFTData;
+        this.wasmFunctions.getFFTDataAtOffset = this.wasmModule._getFFTDataAtOffset;
+        this.wasmFunctions.malloc = this.wasmModule._malloc;
+        this.wasmFunctions.free = this.wasmModule._free;
+        this.wasmFunctions.loadPCMData = this.wasmModule._loadPCMData;
     }
 
     setupEventListeners() {
@@ -97,10 +129,10 @@ class App {
 
             console.log('✓ PCM data loaded to WASM');
 
-            // Get audio info from WASM
-            const sampleCount = this.wasmModule._getSampleCount();
-            const sampleRate = this.wasmModule._getSampleRate();
-            const channels = this.wasmModule._getChannels();
+            // Get audio info from WASM (using cached function references)
+            const sampleCount = this.wasmFunctions.getSampleCount();
+            const sampleRate = this.wasmFunctions.getSampleRate();
+            const channels = this.wasmFunctions.getChannels();
 
             console.log(`WASM loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
 
@@ -130,8 +162,8 @@ class App {
 
             console.log(`PCM data: ${numSamples} samples, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
 
-            // Allocate memory in WASM for float32 array
-            const dataPtr = this.wasmModule._malloc(numSamples * 4); // 4 bytes per float
+            // Allocate memory in WASM for float32 array (using cached function)
+            const dataPtr = this.wasmFunctions.malloc(numSamples * 4); // 4 bytes per float
             console.log(`Allocated ${numSamples * 4} bytes at pointer ${dataPtr}`);
 
             // Copy PCM data to WASM memory
@@ -141,8 +173,8 @@ class App {
             }
             console.log('PCM data copied to WASM memory');
 
-            // Call WASM function to load PCM data
-            const success = this.wasmModule._loadPCMData(
+            // Call WASM function to load PCM data (using cached function)
+            const success = this.wasmFunctions.loadPCMData(
                 dataPtr,
                 numSamples,
                 audioBuffer.sampleRate,
@@ -151,8 +183,8 @@ class App {
 
             console.log(`WASM _loadPCMData returned: ${success}`);
 
-            // Free allocated memory
-            this.wasmModule._free(dataPtr);
+            // Free allocated memory (using cached function)
+            this.wasmFunctions.free(dataPtr);
 
             return success === 1;
         } catch (error) {
@@ -215,16 +247,76 @@ class App {
     getWasmFrequencyData() {
         if (!this.wasmModule || !this.audioPlayer) return null;
 
-        // Get current playback time and convert to sample offset
+        // Get current playback time and convert to sample offset (using cached function)
         const currentTime = this.audioPlayer.getCurrentTime();
-        const sampleRate = this.wasmModule._getSampleRate();
+        const sampleRate = this.wasmFunctions.getSampleRate();
         const sampleOffset = Math.floor(currentTime * sampleRate);
 
         // Get FFT size from analyser (or use default)
         const fftSize = this.audioPlayer.analyser ? this.audioPlayer.analyser.fftSize : 2048;
+        const numBins = fftSize / 2;
 
-        // Call WASM FFT function
-        const fftPtr = this.wasmModule._getFFTDataAtOffset(sampleOffset, fftSize);
+        // Reallocate buffers only if FFT size changed (zero-copy optimization)
+        if (this.currentFFTSize !== fftSize) {
+            this.currentFFTSize = fftSize;
+            this.wasmFrequencyData = new Uint8Array(numBins);
+            this.avgMagnitudesBuffer = new Float32Array(numBins);
+        }
+
+        // Use batch FFT for better performance (4 frames at once)
+        const batchSize = 4;
+        const hopSize = Math.floor(fftSize / 4); // 75% overlap
+
+        // Check if batch FFT is available (using cached function)
+        if (this.wasmFunctions.getBatchFFTData) {
+            // Call batch FFT function (using cached function)
+            const batchPtr = this.wasmFunctions.getBatchFFTData(sampleOffset, batchSize, hopSize, fftSize);
+
+            if (!batchPtr) {
+                console.warn('Batch FFT failed, falling back to single FFT');
+                return this.getSingleWasmFFT(sampleOffset, fftSize, numBins);
+            }
+
+            // Copy batch FFT data from WASM memory
+            const offset = batchPtr / 4; // HEAPF32 is indexed in float units
+            const heapF32 = this.wasmModule.HEAPF32;
+
+            // Clear buffer for averaging
+            this.avgMagnitudesBuffer.fill(0);
+
+            // Average the batch results for smoother visualization
+            for (let frame = 0; frame < batchSize; frame++) {
+                const frameOffset = offset + (frame * numBins);
+                for (let i = 0; i < numBins; i++) {
+                    this.avgMagnitudesBuffer[i] += heapF32[frameOffset + i];
+                }
+            }
+
+            // Combined loop: divide by batch size and find max (reduces iterations)
+            let maxMagnitude = 0;
+            for (let i = 0; i < numBins; i++) {
+                this.avgMagnitudesBuffer[i] /= batchSize;
+                if (this.avgMagnitudesBuffer[i] > maxMagnitude) {
+                    maxMagnitude = this.avgMagnitudesBuffer[i];
+                }
+            }
+
+            // Normalize and convert to 0-255 range in a single pass
+            const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
+            for (let i = 0; i < numBins; i++) {
+                this.wasmFrequencyData[i] = Math.min(255, Math.floor(this.avgMagnitudesBuffer[i] * scale));
+            }
+
+            return this.wasmFrequencyData;
+        } else {
+            console.warn('Batch FFT not available, using single FFT');
+            return this.getSingleWasmFFT(sampleOffset, fftSize, numBins);
+        }
+    }
+
+    getSingleWasmFFT(sampleOffset, fftSize, numBins) {
+        // Call single frame WASM FFT function (using cached function)
+        const fftPtr = this.wasmFunctions.getFFTDataAtOffset(sampleOffset, fftSize);
 
         if (!fftPtr) {
             // Fallback to Web Audio API if WASM FFT fails
@@ -232,27 +324,27 @@ class App {
         }
 
         // Copy FFT data from WASM memory
-        const numBins = fftSize / 2;
         const offset = fftPtr / 4; // HEAPF32 is indexed in float units
+        const heapF32 = this.wasmModule.HEAPF32;
 
-        // Convert float magnitudes to Uint8Array (0-255) like Web Audio API
+        // Reallocate buffer only if size changed (zero-copy optimization)
         if (!this.wasmFrequencyData || this.wasmFrequencyData.length !== numBins) {
             this.wasmFrequencyData = new Uint8Array(numBins);
         }
 
-        // Find max magnitude for normalization
+        // Combined loop: Find max magnitude while caching values (reduces WASM memory access)
         let maxMagnitude = 0;
         for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
+            const magnitude = heapF32[offset + i];
             if (magnitude > maxMagnitude) {
                 maxMagnitude = magnitude;
             }
         }
 
-        // Normalize and convert to 0-255 range
+        // Normalize and convert to 0-255 range in a single pass
         const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
         for (let i = 0; i < numBins; i++) {
-            const magnitude = this.wasmModule.HEAPF32[offset + i];
+            const magnitude = heapF32[offset + i];
             this.wasmFrequencyData[i] = Math.min(255, Math.floor(magnitude * scale));
         }
 

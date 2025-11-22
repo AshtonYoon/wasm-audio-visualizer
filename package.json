@@ -24,6 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "fft.js": "^4.0.4",
     "three": "^0.170.0"
   },
   "devDependencies": {
