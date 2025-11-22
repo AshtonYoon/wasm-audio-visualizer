@@ -44,8 +44,7 @@ class PureJSApp {
         fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
 
         // Player controls
-        document.getElementById('play-btn').addEventListener('click', () => this.play());
-        document.getElementById('pause-btn').addEventListener('click', () => this.pause());
+        document.getElementById('play-pause-btn').addEventListener('click', () => this.togglePlayPause());
         document.getElementById('stop-btn').addEventListener('click', () => this.stop());
 
         // Start animation loop
@@ -97,8 +96,7 @@ class PureJSApp {
             await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
 
             // Enable controls
-            document.getElementById('play-btn').disabled = false;
-            document.getElementById('pause-btn').disabled = false;
+            document.getElementById('play-pause-btn').disabled = false;
             document.getElementById('stop-btn').disabled = false;
 
             this.updateStatus(`Loaded: ${file.name} (${sampleRate} Hz, ${channels}ch, ${loadTime.toFixed(0)}ms)`);
@@ -109,19 +107,21 @@ class PureJSApp {
         }
     }
 
-    play() {
-        if (this.audioPlayer) {
-            this.audioPlayer.play();
-            this.updateStatus('Playing...');
-            this.performanceMonitor.start();
-        }
-    }
+    togglePlayPause() {
+        if (!this.audioPlayer) return;
 
-    pause() {
-        if (this.audioPlayer) {
+        const playPauseBtn = document.getElementById('play-pause-btn');
+
+        if (this.audioPlayer.isPlaying()) {
             this.audioPlayer.pause();
             this.updateStatus('Paused');
             this.performanceMonitor.pause();
+            playPauseBtn.textContent = '▶ Play';
+        } else {
+            this.audioPlayer.play();
+            this.updateStatus('Playing...');
+            this.performanceMonitor.start();
+            playPauseBtn.textContent = '⏸ Pause';
         }
     }
 
@@ -130,6 +130,9 @@ class PureJSApp {
             this.audioPlayer.stop();
             this.updateStatus('Stopped');
             this.performanceMonitor.stop();
+
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            playPauseBtn.textContent = '▶ Play';
         }
     }
 

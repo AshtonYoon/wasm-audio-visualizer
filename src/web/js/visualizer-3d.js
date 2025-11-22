@@ -29,7 +29,7 @@ export class Visualizer3D {
             0.1,
             1000
         );
-        this.camera.position.set(0, 5, 10);
+        this.camera.position.set(0, 15, 25);
 
         // Create renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -41,8 +41,8 @@ export class Visualizer3D {
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        this.controls.minDistance = 5;
-        this.controls.maxDistance = 50;
+        this.controls.minDistance = 10;
+        this.controls.maxDistance = 100;
 
         // Add lights
         const ambientLight = new THREE.AmbientLight(0x404040, 2);

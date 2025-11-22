@@ -105,8 +105,7 @@ class PureJSFFTApp {
         fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
 
         // Player controls
-        document.getElementById('play-btn').addEventListener('click', () => this.play());
-        document.getElementById('pause-btn').addEventListener('click', () => this.pause());
+        document.getElementById('play-pause-btn').addEventListener('click', () => this.togglePlayPause());
         document.getElementById('stop-btn').addEventListener('click', () => this.stop());
 
         // FFT size control
@@ -179,8 +178,7 @@ class PureJSFFTApp {
             this.audioElement.load();
 
             // Enable controls
-            document.getElementById('play-btn').disabled = false;
-            document.getElementById('pause-btn').disabled = false;
+            document.getElementById('play-pause-btn').disabled = false;
             document.getElementById('stop-btn').disabled = false;
 
             this.updateStatus(`Ready to play: ${file.name}`);
@@ -288,18 +286,20 @@ class PureJSFFTApp {
         throw new Error('No fmt chunk found in WAV file');
     }
 
-    play() {
+    togglePlayPause() {
         if (!this.audioData || !this.audioElement) return;
 
-        this.audioElement.play();
-        console.log('Playback started');
-    }
+        const playPauseBtn = document.getElementById('play-pause-btn');
 
-    pause() {
-        if (!this.audioElement) return;
-
-        this.audioElement.pause();
-        console.log('Playback paused');
+        if (this.isPlaying) {
+            this.audioElement.pause();
+            playPauseBtn.textContent = '▶ Play';
+            console.log('Playback paused');
+        } else {
+            this.audioElement.play();
+            playPauseBtn.textContent = '⏸ Pause';
+            console.log('Playback started');
+        }
     }
 
     stop() {
@@ -307,6 +307,10 @@ class PureJSFFTApp {
 
         this.audioElement.pause();
         this.audioElement.currentTime = 0;
+
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        playPauseBtn.textContent = '▶ Play';
+
         console.log('Playback stopped');
     }
 
