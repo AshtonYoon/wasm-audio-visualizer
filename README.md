@@ -188,18 +188,10 @@ npm run clean
   - 빌드 시스템 통합의 어려움
 - CMake 빌드 시스템과 Emscripten의 통합
   - C++ 컴파일러가 아닌 emcc를 사용해야 하는 제약
-  - 크로스 컴파일 환경 설정
 - SIMD 플래그 및 최적화 옵션 설정
   - `-msimd128`, `-O3`, pthread 등 다양한 플래그 조합
-  - SharedArrayBuffer를 위한 COOP/COEP 헤더 설정
 
 **해결 방법:**
-
-- **build.sh 자동화 스크립트 작성**
-
-  - emsdk가 없을 경우 자동으로 `~/emsdk`에 설치
-  - 환경 변수 자동 설정 (`source ~/emsdk/emsdk_env.sh`)
-  - CMake 빌드 및 파일 복사까지 원클릭 자동화
 
 - **CMakeLists.txt 최적화 설정**
 
@@ -351,7 +343,7 @@ npm run clean
 | -------------------- | ---------- | --------------- | --------------------------- |
 | **FFT 처리 시간**    | ~2-5ms     | ~0.5-1ms        | Web Audio API FFT가 더 빠름 |
 | **오디오 로딩 시간** | ~100-200ms | ~50-100ms       | WASM 초기화 오버헤드 포함   |
-| **렌더링 FPS**       | 60 FPS     | 60 FPS          | 동일 (Three.js WebGL)       |
+| **렌더링 FPS**       | 120 FPS    | 120 FPS         | 동일 (Three.js WebGL)       |
 | **메모리 사용량**    | ~15-20MB   | ~10-15MB        | WASM 메모리 풀 포함         |
 
 ### 성능 분석 요약
@@ -383,17 +375,6 @@ npm run clean
 
    - FFmpeg 통합으로 MP3, OGG, FLAC, AAC 등 지원 가능
    - 자체 디코더 구현
-
-3. **SIMD 최적화로 성능 개선 여지**
-   - 현재는 JS ↔ WASM 오버헤드가 크지만
-   - AudioWorklet과 결합 시 Web Audio API 수준 성능 가능
-   - SharedArrayBuffer로 zero-copy 전략 적용
-
-#### 추가 최적화 전략
-
-- AudioWorklet과 WASM 결합으로 오디오 스레드에서 직접 처리
-- radix-4/8 기반 FFT 알고리즘 최적화
-- 입력 버퍼를 WASM 메모리에 유지해 zero-copy 설계
 
 ### 참고 문서
 
