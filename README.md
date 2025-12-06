@@ -33,8 +33,14 @@ Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, dj_fft 
 
 2. **SIMD 최적화**
 
-   - `-msimd128` 플래그를 통한 SIMD 명령어 활용
+   - `-msimd128` 플래그를 통한 WebAssembly SIMD 128-bit 명령어 활용
    - dj_fft의 SIMD 최적화 FFT 알고리즘
+   - **SIMD 사용 코드 위치:**
+     - `CMakeLists.txt:29-30, 35` - 컴파일 플래그 설정
+     - `audio_analyzer.cpp:10-15` - SIMD 지원 감지 (`__wasm_simd128__`)
+     - `audio_analyzer.cpp:21-43` - `apply_window_simd()` - 4개 float 동시 처리 (윈도우 함수 적용)
+     - `audio_analyzer.cpp:46-82` - `compute_magnitude_simd()` - 4개 복소수 동시 처리 (크기 계산)
+     - `dj_fft.h` - FFT 연산 자체에 SIMD 최적화 내장
 
 3. **인터랙티브 컨트롤**
 

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure JavaScript FFT Audio Visualizer</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 300px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .file-input {
+            margin-bottom: 20px;
+        }
+
+        .file-input label {
+            display: block;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .file-input label:hover {
+            transform: translateY(-2px);
+        }
+
+        .file-input input[type="file"] {
+            display: none;
+        }
+
+        .player-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .settings {
+            margin-top: 20px;
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .setting-item input[type="range"] {
+            width: 100%;
+        }
+
+        .setting-item select {
+            width: 100%;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: #fff;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            background: #222;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        #performance-stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+
+        #performance-stats h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #f093fb;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .stat-label {
+            color: #aaa;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #f093fb;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/pure-js-fft-DAf582P0.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/performance-monitor-C4boWBfy.js">
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container"></div>
+
+        <div id="controls">
+            <h1>🎵 Pure JS FFT</h1>
+
+            <div class="file-input">
+                <label for="audio-file">
+                    Choose WAV File
+                    <input type="file" id="audio-file" accept="audio/wav,.wav">
+                </label>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Loading...</div>
+            </div>
+
+            <div class="player-controls">
+                <button id="play-btn" disabled>▶ Play</button>
+                <button id="pause-btn" disabled>⏸ Pause</button>
+                <button id="stop-btn" disabled>⏹ Stop</button>
+            </div>
+
+            <div class="settings">
+                <div class="setting-item">
+                    <label for="fft-size">FFT Size</label>
+                    <select id="fft-size">
+                        <option value="1024">1024</option>
+                        <option value="2048" selected>2048</option>
+                        <option value="4096">4096</option>
+                        <option value="8192">8192</option>
+                        <option value="16384">16384 (Large)</option>
+                        <option value="32768">32768 (Very Large)</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <label for="color-scheme">Color Scheme</label>
+                    <select id="color-scheme">
+                        <option value="purple">Purple Gradient</option>
+                        <option value="ocean">Ocean Blue</option>
+                        <option value="fire">Fire</option>
+                        <option value="rainbow">Rainbow</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <label for="sensitivity">Sensitivity: <span id="sensitivity-value">1.0</span></label>
+                    <input type="range" id="sensitivity" min="0.1" max="3.0" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <div id="performance-stats">
+                <h3>⚡ Performance Metrics (JS FFT)</h3>
+                <div class="stat-row">
+                    <span class="stat-label">FPS:</span>
+                    <span class="stat-value" id="fps-value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Frame Time:</span>
+                    <span class="stat-value" id="frame-time-value">0.00 ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">FFT Time:</span>
+                    <span class="stat-value" id="fft-time-value">0.00 ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Memory:</span>
+                    <span class="stat-value" id="memory-value">0.00 MB</span>
+                </div>
+            </div>
+
+            <div id="status">
+                Ready. Load an audio file to begin.
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

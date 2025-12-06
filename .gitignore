@@ -1,9 +1,9 @@
 # Build outputs
 build/
-dist/
-public/*.wasm
-public/*.js
-public/*.wasm.map
+# dist/
+# public/*.wasm
+# public/*.js
+# public/*.wasm.map
 *.js.mem
 *.data
 *.worker.js
