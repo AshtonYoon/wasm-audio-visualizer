@@ -5,15 +5,17 @@
 #include "audio_decoder.h"
 #include "audio_analyzer.h"
 
-// Global state
+// 전역 상태 (디코더와 분석기 인스턴스)
 static std::unique_ptr<audio::AudioDecoder> g_decoder;
 static std::unique_ptr<audio::AudioAnalyzer> g_analyzer;
 
 extern "C" {
 
 /**
- * Load audio file from memory buffer (WAV format)
- * Returns 1 on success, 0 on failure
+ * WAV 오디오 파일을 메모리 버퍼에서 로드
+ * data: WAV 파일 데이터 포인터
+ * size: 파일 크기 (바이트)
+ * 반환값: 성공 시 1, 실패 시 0
  */
 EMSCRIPTEN_KEEPALIVE
 int loadAudio(const uint8_t* data, size_t size) {
@@ -25,22 +27,26 @@ int loadAudio(const uint8_t* data, size_t size) {
 
     if (success) {
         const auto& info = g_decoder->info();
-        printf("Loaded audio: %s, %d Hz, %d channels, %lld ms\n",
+        printf("오디오 로드 완료: %s, %d Hz, %d channels, %lld ms\n",
                info.format.c_str(),
                info.sample_rate,
                info.channels,
                info.duration_ms);
     } else {
-        printf("Failed to load audio\n");
+        printf("오디오 로드 실패\n");
     }
 
     return success ? 1 : 0;
 }
 
 /**
- * Load audio from already decoded PCM samples
- * This allows any format to be decoded by Web Audio API first
- * Returns 1 on success, 0 on failure
+ * 이미 디코딩된 PCM 샘플에서 오디오 로드
+ * Web Audio API로 먼저 디코딩한 후 이 함수를 사용하면 모든 오디오 포맷 지원 가능
+ * samples: PCM 샘플 배열 포인터
+ * num_samples: 샘플 개수
+ * sample_rate: 샘플 레이트 (Hz)
+ * channels: 채널 수
+ * 반환값: 성공 시 1, 실패 시 0
  */
 EMSCRIPTEN_KEEPALIVE
 int loadPCMData(const float* samples, int num_samples, int sample_rate, int channels) {
@@ -51,7 +57,7 @@ int loadPCMData(const float* samples, int num_samples, int sample_rate, int chan
     g_decoder->loadFromPCM(samples, num_samples, sample_rate, channels);
 
     const auto& info = g_decoder->info();
-    printf("Loaded PCM audio: %d Hz, %d channels, %lld ms\n",
+    printf("PCM 오디오 로드 완료: %d Hz, %d channels, %lld ms\n",
            info.sample_rate,
            info.channels,
            info.duration_ms);
@@ -60,9 +66,9 @@ int loadPCMData(const float* samples, int num_samples, int sample_rate, int chan
 }
 
 /**
- * Get FFT spectrum data
- * @param fft_size FFT size (must be power of 2)
- * @return Pointer to magnitude spectrum
+ * FFT 스펙트럼 데이터 가져오기 (전체 오디오)
+ * fft_size: FFT 크기 (2의 거듭제곱이어야 함, 예: 256, 512, 1024, 2048)
+ * 반환값: 주파수 크기 스펙트럼 배열 포인터 (길이는 fft_size/2)
  */
 EMSCRIPTEN_KEEPALIVE
 const float* getFFTData(int fft_size) {
@@ -85,10 +91,10 @@ const float* getFFTData(int fft_size) {
 }
 
 /**
- * Get FFT spectrum data at specific sample offset (for realtime playback)
- * @param sample_offset Sample offset to start FFT from
- * @param fft_size FFT size (must be power of 2)
- * @return Pointer to magnitude spectrum
+ * 특정 샘플 오프셋에서 FFT 스펙트럼 데이터 가져오기 (실시간 재생용)
+ * sample_offset: FFT를 시작할 샘플 위치
+ * fft_size: FFT 크기 (2의 거듭제곱이어야 함)
+ * 반환값: 주파수 크기 스펙트럼 배열 포인터 (길이는 fft_size/2)
  */
 EMSCRIPTEN_KEEPALIVE
 const float* getFFTDataAtOffset(int sample_offset, int fft_size) {
@@ -104,21 +110,22 @@ const float* getFFTDataAtOffset(int sample_offset, int fft_size) {
 
     const auto& samples = g_decoder->samples();
 
-    // Check bounds
+    // 범위 검사
     if (sample_offset < 0 || sample_offset >= static_cast<int>(samples.size())) {
         return nullptr;
     }
 
     size_t samples_available = samples.size() - sample_offset;
     if (samples_available < static_cast<size_t>(fft_size)) {
-        return nullptr;
+        return nullptr;  // FFT에 필요한 샘플이 부족
     }
 
     return g_analyzer->analyze(samples.data() + sample_offset, samples_available);
 }
 
 /**
- * Get number of audio samples
+ * 총 오디오 샘플 개수 반환
+ * 반환값: 샘플 개수
  */
 EMSCRIPTEN_KEEPALIVE
 int getSampleCount() {
@@ -129,7 +136,8 @@ int getSampleCount() {
 }
 
 /**
- * Get sample rate
+ * 샘플 레이트 반환
+ * 반환값: 샘플 레이트 (Hz)
  */
 EMSCRIPTEN_KEEPALIVE
 int getSampleRate() {
@@ -140,7 +148,8 @@ int getSampleRate() {
 }
 
 /**
- * Get number of channels
+ * 채널 수 반환
+ * 반환값: 채널 수 (1 = 모노, 2 = 스테레오)
  */
 EMSCRIPTEN_KEEPALIVE
 int getChannels() {
@@ -151,13 +160,13 @@ int getChannels() {
 }
 
 /**
- * Cleanup resources
+ * WASM 리소스 정리 (메모리 해제)
  */
 EMSCRIPTEN_KEEPALIVE
 void cleanup() {
     g_decoder.reset();
     g_analyzer.reset();
-    printf("Cleaned up WASM resources\n");
+    printf("WASM 리소스 정리 완료\n");
 }
 
 } // extern "C"

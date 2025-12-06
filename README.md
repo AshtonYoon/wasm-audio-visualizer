@@ -1,6 +1,7 @@
 # WASM Audio Visualizer
 
 ## 1. 팀명 / 팀장 / 팀원 이름
+
 - **팀명**: 음연구소
 - **팀장**: 김태경
 - **팀원**:
@@ -194,113 +195,37 @@ npm run clean
   - 빌드 시스템 통합의 어려움
 - CMake 빌드 시스템과 Emscripten의 통합
   - C++ 컴파일러가 아닌 emcc를 사용해야 하는 제약
-- SIMD 플래그 및 최적화 옵션 설정
-  - `-msimd128`, `-O3`, pthread 등 다양한 플래그 조합
 
-**해결 방법:**
-
-- **CMakeLists.txt 최적화 설정**
-
-  ```cmake
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128 -O3 -pthread")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread -sALLOW_MEMORY_GROWTH=1")
-  ```
-
-- **Vite 설정으로 COOP/COEP 헤더 자동 추가**
-  - SharedArrayBuffer를 위한 보안 헤더 설정
-  - 개발 서버에서 자동으로 적용
-
-### 5.2 FFT 알고리즘 및 SIMD 최적화
-
-**어려웠던 점:**
-
-- dj_fft 라이브러리 통합 및 SIMD 최적화 적용
-  - header-only 라이브러리의 빌드 설정
-  - SIMD 명령어 활성화를 위한 컴파일 플래그
-- **Web Audio API FFT보다 느린 WASM FFT 성능**
-  - 예상과 달리 Web Audio API의 AnalyserNode FFT가 더 빠름
-  - JS ↔ WASM 호출 오버헤드
-  - 메모리 복사 비용
-- SIMD 명령어 활용을 위한 데이터 정렬 (memory alignment)
-
-**해결 방법:**
-
-- **dj_fft의 SIMD-128 최적화 활용**
-
-  - `-msimd128` 플래그로 WebAssembly SIMD 명령어 활성화
-  - dj_fft가 자동으로 SIMD 최적화 코드 경로 선택
-
-- **in-place FFT 알고리즘으로 메모리 복사 최소화**
-
-  - 입력 버퍼를 WASM 메모리에 유지
-  - zero-copy 전략 적용
-
-- **성능 분석 및 문서화 (PERFORMANCE.md)**
-  - Web Audio API FFT가 더 빠른 이유 분석:
-    - 브라우저 네이티브 C++ DSP 엔진 직접 사용
-    - zero-copy 오디오 파이프라인
-    - 전용 오디오 스레드에서 실행
-  - WASM의 장점 파악:
-    - 커스텀 알고리즘 구현 가능
-    - 다양한 오디오 포맷 지원 확장 가능
-  - Pure JavaScript 버전 추가 구현으로 성능 비교
-
-### 5.3 WASM ↔ JavaScript 데이터 전달
+### 5.2 WASM ↔ JavaScript 데이터 전달
 
 **어려웠던 점:**
 
 - **JS-WASM 함수 호출 오버헤드**
   - 매 프레임 FFT 호출 시 성능 저하
   - 함수 호출 자체의 비용
-- **TypedArray 복사 비용**
+- **TypedArray 복사 로직**
   - JavaScript에서 WASM 메모리로 오디오 데이터 복사
   - WASM에서 JavaScript로 FFT 결과 복사
   - Float32Array 변환 비용
 - **메모리 관리 및 누수 방지**
-  - WASM 메모리 할당/해제 관리
-  - JavaScript GC와의 조화
-  - 메모리 누수 디버깅의 어려움
+  - 매 프레임마다 메모리 할당이 필요함
+    - 오디오 시각화 → 60 FPS
+    - → 매 프레임마다 FFT 실행
+    - → 매번 메모리 할당/해제 필요
+    - 일반 malloc/free 사용 시:
+    - 초당 60번 × malloc() + free() = 초당 120번의 시스템 콜
+      - → 느림 💀
 
 **해결 방법:**
-
-- **WASM 메모리에 버퍼 유지 (zero-copy 전략)**
-
-  - 오디오 데이터를 최초 1회만 WASM 메모리에 로드
-  - FFT 결과도 WASM 메모리에 저장
-  - JavaScript에서는 메모리 뷰만 참조
-
-- **SharedArrayBuffer 활용**
-
-  - WASM과 JavaScript 간 메모리 공유
-  - 복사 없이 직접 접근 가능
-  - COOP/COEP 헤더로 보안 요구사항 충족
 
 - **Memory Pool 구현 (`memory_pool.cpp`)**
 
   - 미리 할당된 메모리 풀에서 재사용
   - malloc/free 호출 횟수 최소화
-  - 메모리 단편화 방지
-
-- **성능 모니터링 시스템 (`performance-monitor.js`)**
-  - 실시간 FPS, FFT 처리 시간, 메모리 사용량 추적
-  - 병목 지점 식별 및 최적화
 
 ## 6. 가산점 항목
 
-### WebAssembly SIMD 최적화
-
-- **SIMD 명령어 활성화**: `-msimd128` 플래그로 WebAssembly SIMD 128-bit 명령어 사용
-- **dj_fft SIMD 최적화**: SIMD 명령어를 활용한 벡터화된 FFT 연산
-- **성능 향상**: 일반 스칼라 연산 대비 2-4배 성능 개선 (이론적)
-
 ### 성능 비교 분석 시스템
-
-- **상세 성능 분석 문서 (PERFORMANCE.md)**
-
-  - WASM FFT vs Web Audio API FFT 비교 분석
-  - JS ↔ WASM 오버헤드 분석
-  - 메모리 복사 비용 측정
-  - 최적화 전략 제시
 
 - **두 가지 구현 버전 제공**
 
@@ -312,26 +237,6 @@ npm run clean
   - FPS (Frames Per Second) 측정
   - FFT 처리 시간 측정
   - 메모리 사용량 추적
-  - 화면에 실시간 표시
-
-### 3D 실시간 시각화
-
-- **Three.js 하드웨어 가속 3D 렌더링**
-
-  - WebGL 기반 GPU 가속
-  - 60 FPS 실시간 렌더링
-
-- **64개 스펙트럼 바의 원형 배치**
-
-  - 주파수 대역별 3D 막대 그래프
-  - 원형 레이아웃으로 360도 시각화
-  - 높이와 색상으로 진폭 표현
-
-- **인터랙티브 카메라 컨트롤**
-  - OrbitControls로 자유로운 시점 조작
-  - 마우스 드래그: 회전 (orbit)
-  - 스크롤: 줌 (zoom)
-  - 우클릭 드래그: 이동 (pan)
 
 ## 7. 성능 측정 결과
 
@@ -355,6 +260,8 @@ npm run clean
 ### 성능 분석 요약
 
 #### Web Audio API FFT가 더 빠른 이유
+
+브라우저의 Web Audio API FFT는 브라우저 내부 네이티브(C/C++/SIMD) DSP 엔진을 직접 호출하는 반면, WASM FFT는 JS ↔ WASM 오버헤드 + 메모리 복사 비용 + SIMD 최적화 부족 때문에 더 느리게 동작할 수 있다.
 
 1. **브라우저 네이티브 C++ DSP 엔진 직접 사용**
 
