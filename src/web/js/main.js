@@ -13,12 +13,12 @@ class App {
         this.performanceMonitor = null;
         this.audioData = null;
 
-        // Performance optimization: Pre-allocated buffers (zero-copy design)
+        // 성능 최적화: 사전 할당 버퍼 (zero-copy 설계)
         this.wasmFrequencyData = null;
         this.avgMagnitudesBuffer = null;
         this.currentFFTSize = 0;
 
-        // Cache WASM function references to avoid lookup overhead
+        // 조회 오버헤드 방지를 위한 WASM 함수 참조 캐싱
         this.wasmFunctions = {
             getSampleCount: null,
             getSampleRate: null,
@@ -33,38 +33,38 @@ class App {
 
     async init() {
         try {
-            // Show loading
+            // 로딩 표시
             document.getElementById('loading').classList.add('active');
-            this.updateStatus('Loading WASM module...');
+            this.updateStatus('WASM 모듈 로딩 중...');
 
-            // Load WASM module
+            // WASM 모듈 로드
             this.wasmModule = await WasmModule();
-            console.log('WASM module loaded successfully');
+            console.log('WASM 모듈 로드 완료');
 
-            // Cache WASM function references for performance
+            // 성능을 위한 WASM 함수 참조 캐싱
             this.cacheWasmFunctions();
 
-            // Initialize components
+            // 컴포넌트 초기화
             this.audioPlayer = new AudioPlayer();
             this.visualizer = new Visualizer3D('canvas-container');
             this.uiControls = new UIControls(this);
             this.performanceMonitor = new PerformanceMonitor();
 
-            // Setup event listeners
+            // 이벤트 리스너 설정
             this.setupEventListeners();
 
-            // Hide loading
+            // 로딩 숨기기
             document.getElementById('loading').classList.remove('active');
-            this.updateStatus('Ready. Load an audio file to begin.');
+            this.updateStatus('준비 완료. 오디오 파일을 로드하세요.');
 
         } catch (error) {
-            console.error('Failed to initialize app:', error);
-            this.updateStatus('Error: Failed to load WASM module. Check console for details.');
+            console.error('앱 초기화 실패:', error);
+            this.updateStatus('에러: WASM 모듈 로드 실패. 콘솔을 확인하세요.');
         }
     }
 
     cacheWasmFunctions() {
-        // Cache frequently used WASM function references to avoid lookup overhead
+        // 조회 오버헤드 방지를 위해 자주 사용하는 WASM 함수 참조 캐싱
         this.wasmFunctions.getSampleCount = this.wasmModule._getSampleCount;
         this.wasmFunctions.getSampleRate = this.wasmModule._getSampleRate;
         this.wasmFunctions.getChannels = this.wasmModule._getChannels;
@@ -76,15 +76,15 @@ class App {
     }
 
     setupEventListeners() {
-        // File input
+        // 파일 입력
         const fileInput = document.getElementById('audio-file');
         fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
 
-        // Player controls
+        // 플레이어 컨트롤
         document.getElementById('play-pause-btn').addEventListener('click', () => this.togglePlayPause());
         document.getElementById('stop-btn').addEventListener('click', () => this.stop());
 
-        // Start animation loop
+        // 애니메이션 루프 시작
         this.animate();
     }
 
@@ -93,85 +93,85 @@ class App {
         if (!file) return;
 
         try {
-            this.updateStatus(`Loading ${file.name}...`);
-            console.log(`Loading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+            this.updateStatus(`${file.name} 로딩 중...`);
+            console.log(`파일 로드 중: ${file.name}, 타입: ${file.type}, 크기: ${file.size} bytes`);
 
-            // Read file as ArrayBuffer
+            // ArrayBuffer로 파일 읽기
             const arrayBuffer = await file.arrayBuffer();
-            console.log(`ArrayBuffer loaded, size: ${arrayBuffer.byteLength} bytes`);
+            console.log(`ArrayBuffer 로드 완료, 크기: ${arrayBuffer.byteLength} bytes`);
 
-            // Decode with Web Audio API (supports all formats)
+            // Web Audio API로 디코딩 (모든 포맷 지원)
             if (!this.audioPlayer.audioContext) {
                 this.audioPlayer.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            this.updateStatus(`Decoding ${file.name}...`);
-            console.log('Decoding with Web Audio API...');
+            this.updateStatus(`${file.name} 디코딩 중...`);
+            console.log('Web Audio API로 디코딩 중...');
 
             let audioBuffer;
             try {
                 audioBuffer = await this.audioPlayer.audioContext.decodeAudioData(arrayBuffer.slice(0));
             } catch (decodeError) {
-                console.error('Web Audio API decode error:', decodeError);
-                throw new Error(`Failed to decode ${file.name}. Format may not be supported by your browser.`);
+                console.error('Web Audio API 디코드 에러:', decodeError);
+                throw new Error(`${file.name} 디코딩 실패. 브라우저에서 지원하지 않는 포맷일 수 있습니다.`);
             }
 
-            console.log(`✓ Decoded: ${file.name}, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+            console.log(`✓ 디코딩 완료: ${file.name}, ${audioBuffer.duration.toFixed(2)}초, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}채널`);
 
-            // Load PCM data to WASM for visualization
-            this.updateStatus(`Loading to WASM...`);
+            // 시각화를 위해 PCM 데이터를 WASM에 로드
+            this.updateStatus(`WASM에 로딩 중...`);
             const success = this.loadPCMToWasm(audioBuffer);
 
             if (!success) {
-                throw new Error('Failed to load audio data to WASM visualization engine.');
+                throw new Error('WASM 시각화 엔진에 오디오 데이터 로드 실패.');
             }
 
-            console.log('✓ PCM data loaded to WASM');
+            console.log('✓ PCM 데이터를 WASM에 로드 완료');
 
-            // Get audio info from WASM (using cached function references)
+            // WASM에서 오디오 정보 가져오기 (캐시된 함수 참조 사용)
             const sampleCount = this.wasmFunctions.getSampleCount();
             const sampleRate = this.wasmFunctions.getSampleRate();
             const channels = this.wasmFunctions.getChannels();
 
-            console.log(`WASM loaded: ${sampleCount} samples, ${sampleRate} Hz, ${channels} ch`);
+            console.log(`WASM 로드 완료: ${sampleCount} 샘플, ${sampleRate} Hz, ${channels} 채널`);
 
-            // Load audio into Web Audio API for playback
+            // 재생을 위해 Web Audio API에 오디오 로드
             await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
 
-            // Enable controls
+            // 컨트롤 활성화
             document.getElementById('play-pause-btn').disabled = false;
             document.getElementById('stop-btn').disabled = false;
 
-            this.updateStatus(`Loaded: ${file.name} (${sampleRate} Hz, ${channels}ch)`);
+            this.updateStatus(`로드 완료: ${file.name} (${sampleRate} Hz, ${channels}채널)`);
 
         } catch (error) {
-            console.error('Error loading file:', error);
-            this.updateStatus(`Error: ${error.message}`);
+            console.error('파일 로드 에러:', error);
+            this.updateStatus(`에러: ${error.message}`);
         }
     }
 
     loadPCMToWasm(audioBuffer) {
         try {
-            console.log('Loading PCM to WASM...');
+            console.log('WASM에 PCM 로딩 중...');
 
-            // Get channel data (use first channel for mono, or mix to mono)
+            // 채널 데이터 가져오기 (모노의 경우 첫 번째 채널 사용, 또는 모노로 믹스)
             const channelData = audioBuffer.getChannelData(0);
             const numSamples = channelData.length;
 
-            console.log(`PCM data: ${numSamples} samples, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+            console.log(`PCM 데이터: ${numSamples} 샘플, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}채널`);
 
-            // Allocate memory in WASM for float32 array (using cached function)
-            const dataPtr = this.wasmFunctions.malloc(numSamples * 4); // 4 bytes per float
-            console.log(`Allocated ${numSamples * 4} bytes at pointer ${dataPtr}`);
+            // WASM에 float32 배열을 위한 메모리 할당 (캐시된 함수 사용)
+            const dataPtr = this.wasmFunctions.malloc(numSamples * 4); // float당 4바이트
+            console.log(`포인터 ${dataPtr}에 ${numSamples * 4} 바이트 할당`);
 
-            // Copy PCM data to WASM memory
-            const offset = dataPtr / 4; // HEAPF32 is indexed in float units
+            // WASM 메모리에 PCM 데이터 복사
+            const offset = dataPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
             for (let i = 0; i < numSamples; i++) {
                 this.wasmModule.HEAPF32[offset + i] = channelData[i];
             }
-            console.log('PCM data copied to WASM memory');
+            console.log('PCM 데이터를 WASM 메모리에 복사 완료');
 
-            // Call WASM function to load PCM data (using cached function)
+            // PCM 데이터 로드를 위해 WASM 함수 호출 (캐시된 함수 사용)
             const success = this.wasmFunctions.loadPCMData(
                 dataPtr,
                 numSamples,
@@ -179,14 +179,14 @@ class App {
                 audioBuffer.numberOfChannels
             );
 
-            console.log(`WASM _loadPCMData returned: ${success}`);
+            console.log(`WASM _loadPCMData 반환값: ${success}`);
 
-            // Free allocated memory (using cached function)
+            // 할당된 메모리 해제 (캐시된 함수 사용)
             this.wasmFunctions.free(dataPtr);
 
             return success === 1;
         } catch (error) {
-            console.error('Error loading PCM to WASM:', error);
+            console.error('WASM에 PCM 로드 에러:', error);
             return false;
         }
     }
@@ -198,25 +198,25 @@ class App {
 
         if (this.audioPlayer.isPlaying()) {
             this.audioPlayer.pause();
-            this.updateStatus('Paused');
+            this.updateStatus('일시정지');
             this.performanceMonitor.pause();
-            playPauseBtn.textContent = '▶ Play';
+            playPauseBtn.textContent = '▶ 재생';
         } else {
             this.audioPlayer.play();
-            this.updateStatus('Playing...');
+            this.updateStatus('재생 중...');
             this.performanceMonitor.start();
-            playPauseBtn.textContent = '⏸ Pause';
+            playPauseBtn.textContent = '⏸ 일시정지';
         }
     }
 
     stop() {
         if (this.audioPlayer) {
             this.audioPlayer.stop();
-            this.updateStatus('Stopped');
+            this.updateStatus('정지');
             this.performanceMonitor.stop();
 
             const playPauseBtn = document.getElementById('play-pause-btn');
-            playPauseBtn.textContent = '▶ Play';
+            playPauseBtn.textContent = '▶ 재생';
         }
     }
 
@@ -225,16 +225,16 @@ class App {
 
         this.performanceMonitor.beginFrame();
 
-        // Update visualizer (camera controls, etc.)
+        // 비주얼라이저 업데이트 (카메라 컨트롤 등)
         if (this.visualizer) {
             this.visualizer.render();
         }
 
-        // Update visualization with current audio data if playing
+        // 재생 중이면 현재 오디오 데이터로 시각화 업데이트
         if (this.audioPlayer && this.audioPlayer.isPlaying()) {
             this.performanceMonitor.beginFFT();
 
-            // Use WASM FFT for spectrum analysis
+            // 스펙트럼 분석에 WASM FFT 사용
             const wasmFrequencyData = this.getWasmFrequencyData();
 
             this.performanceMonitor.endFFT();
@@ -250,44 +250,44 @@ class App {
     getWasmFrequencyData() {
         if (!this.wasmModule || !this.audioPlayer) return null;
 
-        // Get current playback time and convert to sample offset (using cached function)
+        // 현재 재생 시간을 샘플 오프셋으로 변환 (캐시된 함수 사용)
         const currentTime = this.audioPlayer.getCurrentTime();
         const sampleRate = this.wasmFunctions.getSampleRate();
         const sampleOffset = Math.floor(currentTime * sampleRate);
 
-        // Get FFT size from analyser (or use default)
+        // analyser에서 FFT 크기 가져오기 (또는 기본값 사용)
         const fftSize = this.audioPlayer.analyser ? this.audioPlayer.analyser.fftSize : 2048;
         const numBins = fftSize / 2;
 
-        // Reallocate buffers only if FFT size changed (zero-copy optimization)
+        // FFT 크기가 변경된 경우에만 버퍼 재할당 (zero-copy 최적화)
         if (this.currentFFTSize !== fftSize) {
             this.currentFFTSize = fftSize;
             this.wasmFrequencyData = new Uint8Array(numBins);
             this.avgMagnitudesBuffer = new Float32Array(numBins);
         }
 
-        // Use batch FFT for better performance (4 frames at once)
+        // 더 나은 성능을 위해 배치 FFT 사용 (한 번에 4 프레임)
         const batchSize = 4;
-        const hopSize = Math.floor(fftSize / 4); // 75% overlap
+        const hopSize = Math.floor(fftSize / 4); // 75% 오버랩
 
-        // Check if batch FFT is available (using cached function)
+        // 배치 FFT 사용 가능 여부 확인 (캐시된 함수 사용)
         if (this.wasmFunctions.getBatchFFTData) {
-            // Call batch FFT function (using cached function)
+            // 배치 FFT 함수 호출 (캐시된 함수 사용)
             const batchPtr = this.wasmFunctions.getBatchFFTData(sampleOffset, batchSize, hopSize, fftSize);
 
             if (!batchPtr) {
-                console.warn('Batch FFT failed, falling back to single FFT');
+                console.warn('배치 FFT 실패, 단일 FFT로 폴백');
                 return this.getSingleWasmFFT(sampleOffset, fftSize, numBins);
             }
 
-            // Copy batch FFT data from WASM memory
-            const offset = batchPtr / 4; // HEAPF32 is indexed in float units
+            // WASM 메모리에서 배치 FFT 데이터 복사
+            const offset = batchPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
             const heapF32 = this.wasmModule.HEAPF32;
 
-            // Clear buffer for averaging
+            // 평균 계산을 위해 버퍼 초기화
             this.avgMagnitudesBuffer.fill(0);
 
-            // Average the batch results for smoother visualization
+            // 더 부드러운 시각화를 위해 배치 결과 평균화
             for (let frame = 0; frame < batchSize; frame++) {
                 const frameOffset = offset + (frame * numBins);
                 for (let i = 0; i < numBins; i++) {
@@ -295,7 +295,7 @@ class App {
                 }
             }
 
-            // Combined loop: divide by batch size and find max (reduces iterations)
+            // 결합 루프: 배치 크기로 나누고 최대값 찾기 (반복 횟수 감소)
             let maxMagnitude = 0;
             for (let i = 0; i < numBins; i++) {
                 this.avgMagnitudesBuffer[i] /= batchSize;
@@ -304,7 +304,7 @@ class App {
                 }
             }
 
-            // Normalize and convert to 0-255 range in a single pass
+            // 한 번에 정규화하고 0-255 범위로 변환
             const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
             for (let i = 0; i < numBins; i++) {
                 this.wasmFrequencyData[i] = Math.min(255, Math.floor(this.avgMagnitudesBuffer[i] * scale));
@@ -312,30 +312,30 @@ class App {
 
             return this.wasmFrequencyData;
         } else {
-            console.warn('Batch FFT not available, using single FFT');
+            console.warn('배치 FFT 사용 불가, 단일 FFT 사용');
             return this.getSingleWasmFFT(sampleOffset, fftSize, numBins);
         }
     }
 
     getSingleWasmFFT(sampleOffset, fftSize, numBins) {
-        // Call single frame WASM FFT function (using cached function)
+        // 단일 프레임 WASM FFT 함수 호출 (캐시된 함수 사용)
         const fftPtr = this.wasmFunctions.getFFTDataAtOffset(sampleOffset, fftSize);
 
         if (!fftPtr) {
-            // Fallback to Web Audio API if WASM FFT fails
+            // WASM FFT 실패 시 Web Audio API로 폴백
             return this.audioPlayer.getFrequencyData();
         }
 
-        // Copy FFT data from WASM memory
-        const offset = fftPtr / 4; // HEAPF32 is indexed in float units
+        // WASM 메모리에서 FFT 데이터 복사
+        const offset = fftPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
         const heapF32 = this.wasmModule.HEAPF32;
 
-        // Reallocate buffer only if size changed (zero-copy optimization)
+        // 크기가 변경된 경우에만 버퍼 재할당 (zero-copy 최적화)
         if (!this.wasmFrequencyData || this.wasmFrequencyData.length !== numBins) {
             this.wasmFrequencyData = new Uint8Array(numBins);
         }
 
-        // Combined loop: Find max magnitude while caching values (reduces WASM memory access)
+        // 결합 루프: 값을 캐싱하면서 최대 크기 찾기 (WASM 메모리 액세스 감소)
         let maxMagnitude = 0;
         for (let i = 0; i < numBins; i++) {
             const magnitude = heapF32[offset + i];
@@ -344,7 +344,7 @@ class App {
             }
         }
 
-        // Normalize and convert to 0-255 range in a single pass
+        // 한 번에 정규화하고 0-255 범위로 변환
         const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
         for (let i = 0; i < numBins; i++) {
             const magnitude = heapF32[offset + i];
@@ -359,7 +359,7 @@ class App {
     }
 }
 
-// Initialize app when DOM is ready
+// DOM 준비 시 앱 초기화
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         const app = new App();

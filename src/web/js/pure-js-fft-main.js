@@ -1,24 +1,24 @@
-import FFT from 'fft.js';
+import { PureFFT } from './pure-fft.js';
 import { Visualizer3D } from './visualizer-3d.js';
 import { PerformanceMonitor } from './performance-monitor.js';
 
 class PureJSFFTApp {
     constructor() {
-        // Audio data
-        this.audioData = null; // Raw PCM samples
+        // 오디오 데이터
+        this.audioData = null; // Raw PCM 샘플
         this.sampleRate = 44100;
         this.channels = 2;
         this.duration = 0;
 
-        // Playback
+        // 재생
         this.audioElement = null;
         this.isPlaying = false;
 
-        // Components
+        // 컴포넌트
         this.visualizer = null;
         this.performanceMonitor = null;
 
-        // FFT setup
+        // FFT 설정
         this.fftSize = 2048;
         this.fft = null;
         this.fftInput = null;
@@ -28,33 +28,33 @@ class PureJSFFTApp {
 
     async init() {
         try {
-            console.log('Starting initialization...');
+            console.log('초기화 시작...');
 
-            // Show loading
+            // 로딩 표시
             document.getElementById('loading').classList.add('active');
-            this.updateStatus('Initializing Pure JavaScript FFT visualizer...');
+            this.updateStatus('순수 JavaScript DFT 비주얼라이저 초기화 중...');
 
-            // Create HTML5 Audio element
-            console.log('Creating audio element...');
+            // HTML5 Audio 엘리먼트 생성
+            console.log('오디오 엘리먼트 생성 중...');
             this.audioElement = new Audio();
             this.audioElement.addEventListener('play', () => { this.isPlaying = true; });
             this.audioElement.addEventListener('pause', () => { this.isPlaying = false; });
             this.audioElement.addEventListener('ended', () => { this.isPlaying = false; });
-            console.log('Audio element created:', this.audioElement);
+            console.log('오디오 엘리먼트 생성 완료:', this.audioElement);
 
-            // Initialize components
-            console.log('Creating Visualizer3D...');
+            // 컴포넌트 초기화
+            console.log('Visualizer3D 생성 중...');
             this.visualizer = new Visualizer3D('canvas-container');
-            console.log('Visualizer3D created:', this.visualizer);
+            console.log('Visualizer3D 생성 완료:', this.visualizer);
 
-            console.log('Creating PerformanceMonitor...');
+            console.log('PerformanceMonitor 생성 중...');
             try {
                 this.performanceMonitor = new PerformanceMonitor();
-                this.performanceMonitor.start(); // Start monitoring
-                console.log('PerformanceMonitor created and started:', this.performanceMonitor);
+                this.performanceMonitor.start(); // 모니터링 시작
+                console.log('PerformanceMonitor 생성 및 시작 완료:', this.performanceMonitor);
             } catch (perfError) {
-                console.error('PerformanceMonitor creation failed:', perfError);
-                // Create a dummy performance monitor
+                console.error('PerformanceMonitor 생성 실패:', perfError);
+                // 더미 성능 모니터 생성
                 this.performanceMonitor = {
                     beginFrame: () => {},
                     endFrame: () => {},
@@ -63,59 +63,59 @@ class PureJSFFTApp {
                 };
             }
 
-            // Initialize FFT
-            console.log('Initializing FFT with size:', this.fftSize);
+            // DFT 초기화
+            console.log('DFT 초기화 중, 크기:', this.fftSize);
             this.initFFT(this.fftSize);
-            console.log('FFT initialized:', this.fft);
+            console.log('DFT 초기화 완료:', this.fft);
 
-            // Setup event listeners
-            console.log('Setting up event listeners...');
+            // 이벤트 리스너 설정
+            console.log('이벤트 리스너 설정 중...');
             this.setupEventListeners();
 
-            // Hide loading
+            // 로딩 숨기기
             document.getElementById('loading').classList.remove('active');
-            this.updateStatus('Ready. Load an audio file to begin.');
+            this.updateStatus('준비 완료. 오디오 파일을 로드하세요.');
 
-            console.log('Pure JavaScript FFT visualizer initialized successfully');
+            console.log('순수 JavaScript DFT 비주얼라이저 초기화 완료');
 
         } catch (error) {
-            console.error('Failed to initialize app:', error);
-            console.error('Error stack:', error.stack);
-            this.updateStatus('Error: Failed to initialize visualizer. Check console for details.');
+            console.error('앱 초기화 실패:', error);
+            console.error('에러 스택:', error.stack);
+            this.updateStatus('에러: 비주얼라이저 초기화 실패. 콘솔을 확인하세요.');
         }
     }
 
     initFFT(size) {
         this.fftSize = size;
-        this.fft = new FFT(size);
-        this.fftInput = new Array(size);
+        this.fft = new PureFFT(size);
+        this.fftInput = new Float32Array(size);
         this.fftOutput = this.fft.createComplexArray();
         this.frequencyData = new Uint8Array(size / 2);
-        console.log(`FFT initialized with size ${size}`);
+        console.log(`순수 JavaScript DFT 초기화 완료, 크기: ${size}`);
     }
 
     setFFTSize(size) {
         this.initFFT(size);
-        console.log(`FFT size changed to ${size}`);
+        console.log(`FFT 크기 변경: ${size}`);
     }
 
     setupEventListeners() {
-        // File input
+        // 파일 입력
         const fileInput = document.getElementById('audio-file');
         fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
 
-        // Player controls
+        // 플레이어 컨트롤
         document.getElementById('play-pause-btn').addEventListener('click', () => this.togglePlayPause());
         document.getElementById('stop-btn').addEventListener('click', () => this.stop());
 
-        // FFT size control
+        // FFT 크기 컨트롤
         const fftSizeSelect = document.getElementById('fft-size');
         fftSizeSelect.addEventListener('change', (e) => {
             const size = parseInt(e.target.value);
             this.setFFTSize(size);
         });
 
-        // Color scheme selector
+        // 색상 스킴 선택기
         const colorSchemeSelect = document.getElementById('color-scheme');
         colorSchemeSelect.addEventListener('change', (e) => {
             const scheme = e.target.value;
@@ -124,7 +124,7 @@ class PureJSFFTApp {
             }
         });
 
-        // Sensitivity slider
+        // 감도 슬라이더
         const sensitivitySlider = document.getElementById('sensitivity');
         const sensitivityValue = document.getElementById('sensitivity-value');
         sensitivitySlider.addEventListener('input', (e) => {
@@ -135,7 +135,7 @@ class PureJSFFTApp {
             }
         });
 
-        // Start animation loop
+        // 애니메이션 루프 시작
         this.animate();
     }
 
@@ -144,18 +144,18 @@ class PureJSFFTApp {
         if (!file) return;
 
         try {
-            this.updateStatus(`Loading ${file.name}...`);
-            console.log(`Loading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+            this.updateStatus(`${file.name} 로딩 중...`);
+            console.log(`파일 로드 중: ${file.name}, 타입: ${file.type}, 크기: ${file.size} bytes`);
 
             const loadStart = performance.now();
 
-            // Read file as ArrayBuffer
+            // ArrayBuffer로 파일 읽기
             const arrayBuffer = await file.arrayBuffer();
-            console.log(`ArrayBuffer loaded, size: ${arrayBuffer.byteLength} bytes`);
+            console.log(`ArrayBuffer 로드 완료, 크기: ${arrayBuffer.byteLength} bytes`);
 
-            // Parse WAV file
-            this.updateStatus(`Parsing ${file.name}...`);
-            console.log('Parsing WAV file...');
+            // WAV 파일 파싱
+            this.updateStatus(`${file.name} 파싱 중...`);
+            console.log('WAV 파일 파싱 중...');
 
             try {
                 const wavData = this.parseWAV(arrayBuffer);
@@ -164,47 +164,47 @@ class PureJSFFTApp {
                 this.channels = wavData.channels;
                 this.duration = wavData.duration;
             } catch (parseError) {
-                console.error('WAV parsing error:', parseError);
-                throw new Error(`Failed to parse ${file.name}. Only WAV format is supported.`);
+                console.error('WAV 파싱 에러:', parseError);
+                throw new Error(`${file.name} 파싱 실패. WAV 포맷만 지원됩니다.`);
             }
 
             const loadTime = performance.now() - loadStart;
-            console.log(`✓ Parsed: ${file.name}, ${this.duration.toFixed(2)}s, ${this.sampleRate}Hz, ${this.channels}ch`);
-            console.log(`Load time: ${loadTime.toFixed(2)}ms`);
+            console.log(`✓ 파싱 완료: ${file.name}, ${this.duration.toFixed(2)}초, ${this.sampleRate}Hz, ${this.channels}채널`);
+            console.log(`로드 시간: ${loadTime.toFixed(2)}ms`);
 
-            // Set up audio element for playback
+            // 재생을 위한 오디오 엘리먼트 설정
             const url = URL.createObjectURL(file);
             this.audioElement.src = url;
             this.audioElement.load();
 
-            // Enable controls
+            // 컨트롤 활성화
             document.getElementById('play-pause-btn').disabled = false;
             document.getElementById('stop-btn').disabled = false;
 
-            this.updateStatus(`Ready to play: ${file.name}`);
+            this.updateStatus(`재생 준비 완료: ${file.name}`);
 
         } catch (error) {
-            console.error('Failed to load audio file:', error);
-            this.updateStatus(`Error: ${error.message}`);
+            console.error('오디오 파일 로드 실패:', error);
+            this.updateStatus(`에러: ${error.message}`);
         }
     }
 
     parseWAV(arrayBuffer) {
         const view = new DataView(arrayBuffer);
 
-        // Check RIFF header
+        // RIFF 헤더 확인
         const riff = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
         if (riff !== 'RIFF') {
-            throw new Error('Not a valid WAV file (missing RIFF header)');
+            throw new Error('유효한 WAV 파일이 아닙니다 (RIFF 헤더 누락)');
         }
 
-        // Check WAVE format
+        // WAVE 포맷 확인
         const wave = String.fromCharCode(view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11));
         if (wave !== 'WAVE') {
-            throw new Error('Not a valid WAV file (missing WAVE format)');
+            throw new Error('유효한 WAV 파일이 아닙니다 (WAVE 포맷 누락)');
         }
 
-        // Find fmt chunk
+        // fmt 청크 찾기
         let offset = 12;
         while (offset < view.byteLength) {
             const chunkId = String.fromCharCode(
@@ -220,9 +220,9 @@ class PureJSFFTApp {
                 const sampleRate = view.getUint32(offset + 12, true);
                 const bitsPerSample = view.getUint16(offset + 22, true);
 
-                console.log(`WAV format: ${channels}ch, ${sampleRate}Hz, ${bitsPerSample}bit`);
+                console.log(`WAV 포맷: ${channels}채널, ${sampleRate}Hz, ${bitsPerSample}bit`);
 
-                // Find data chunk
+                // data 청크 찾기
                 let dataOffset = offset + 8 + chunkSize;
                 while (dataOffset < view.byteLength) {
                     const dataChunkId = String.fromCharCode(
@@ -234,7 +234,7 @@ class PureJSFFTApp {
                     const dataChunkSize = view.getUint32(dataOffset + 4, true);
 
                     if (dataChunkId === 'data') {
-                        // Extract PCM data
+                        // PCM 데이터 추출
                         const numSamples = dataChunkSize / (bitsPerSample / 8) / channels;
                         const audioData = new Float32Array(numSamples);
 
@@ -263,7 +263,7 @@ class PureJSFFTApp {
 
                                 sum += sample;
                             }
-                            audioData[sampleIndex++] = sum / channels; // Convert to mono by averaging
+                            audioData[sampleIndex++] = sum / channels; // 평균을 내어 모노로 변환
                         }
 
                         return {
@@ -277,13 +277,13 @@ class PureJSFFTApp {
                     dataOffset += 8 + dataChunkSize;
                 }
 
-                throw new Error('No data chunk found in WAV file');
+                throw new Error('WAV 파일에서 data 청크를 찾을 수 없습니다');
             }
 
             offset += 8 + chunkSize;
         }
 
-        throw new Error('No fmt chunk found in WAV file');
+        throw new Error('WAV 파일에서 fmt 청크를 찾을 수 없습니다');
     }
 
     togglePlayPause() {
@@ -293,12 +293,12 @@ class PureJSFFTApp {
 
         if (this.isPlaying) {
             this.audioElement.pause();
-            playPauseBtn.textContent = '▶ Play';
-            console.log('Playback paused');
+            playPauseBtn.textContent = '▶ 재생';
+            console.log('재생 일시정지');
         } else {
             this.audioElement.play();
-            playPauseBtn.textContent = '⏸ Pause';
-            console.log('Playback started');
+            playPauseBtn.textContent = '⏸ 일시정지';
+            console.log('재생 시작');
         }
     }
 
@@ -309,9 +309,9 @@ class PureJSFFTApp {
         this.audioElement.currentTime = 0;
 
         const playPauseBtn = document.getElementById('play-pause-btn');
-        playPauseBtn.textContent = '▶ Play';
+        playPauseBtn.textContent = '▶ 재생';
 
-        console.log('Playback stopped');
+        console.log('재생 정지');
     }
 
     getCurrentTime() {
@@ -324,7 +324,7 @@ class PureJSFFTApp {
         this.performanceMonitor.beginFrame();
 
         if (this.isPlaying && this.audioData) {
-            // Get frequency data using JavaScript FFT
+            // JavaScript DFT를 사용하여 주파수 데이터 가져오기
             this.performanceMonitor.beginFFT();
             const frequencyData = this.getFrequencyData();
             this.performanceMonitor.endFFT();
@@ -334,7 +334,7 @@ class PureJSFFTApp {
             }
         }
 
-        // Render the visualizer
+        // 비주얼라이저 렌더링
         if (this.visualizer) {
             this.visualizer.render();
         }
@@ -345,30 +345,30 @@ class PureJSFFTApp {
     getFrequencyData() {
         if (!this.audioData || !this.isPlaying) return null;
 
-        // Get current playback position
+        // 현재 재생 위치 가져오기
         const currentTime = this.getCurrentTime();
         const sampleOffset = Math.floor(currentTime * this.sampleRate);
 
-        // Use raw PCM data
+        // Raw PCM 데이터 사용
         const channelData = this.audioData;
 
-        // Extract samples for FFT
+        // FFT용 샘플 추출
         const numSamples = this.fftSize;
         if (sampleOffset + numSamples > channelData.length) {
-            return null; // Not enough samples
+            return null; // 샘플 부족
         }
 
-        // Apply Hann window and prepare input
+        // Hann 윈도우 적용 및 입력 준비
         for (let i = 0; i < numSamples; i++) {
-            // Hann window function
+            // Hann 윈도우 함수
             const windowValue = 0.5 * (1 - Math.cos(2 * Math.PI * i / (numSamples - 1)));
             this.fftInput[i] = channelData[sampleOffset + i] * windowValue;
         }
 
-        // Perform FFT
+        // DFT 수행
         this.fft.realTransform(this.fftOutput, this.fftInput);
 
-        // Calculate magnitudes
+        // 크기 계산
         const numBins = this.fftSize / 2;
         let maxMagnitude = 0;
 
@@ -384,7 +384,7 @@ class PureJSFFTApp {
             this.frequencyData[i] = magnitude;
         }
 
-        // Normalize to 0-255 range
+        // 0-255 범위로 정규화
         const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
         for (let i = 0; i < numBins; i++) {
             this.frequencyData[i] = Math.min(255, Math.floor(this.frequencyData[i] * scale));
@@ -398,7 +398,7 @@ class PureJSFFTApp {
     }
 }
 
-// Initialize app when DOM is ready
+// DOM 준비 시 앱 초기화
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         const app = new PureJSFFTApp();

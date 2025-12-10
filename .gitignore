@@ -10,7 +10,6 @@ build/
 
 # Dependencies
 node_modules/
-src/third_party/ffmpeg/
 
 # IDE
 .vscode/
