@@ -250,53 +250,60 @@ npm run clean
 
 ### 성능 비교 (WASM vs Pure JavaScript)
 
-| 측정 항목            | WASM (C++) | Pure JavaScript DFT | 비고                             |
+| 측정 항목            | WASM (C++) | Pure JavaScript FFT | 비고                             |
 | -------------------- | ---------- | ------------------- | -------------------------------- |
-| **FFT 처리 시간**    | ~0.5ms     | ~3.4ms              | WASM이 약 6.8배 빠름             |
-| **프레임 시간**      | ~0.22ms    | ~0.24ms             | 거의 동일                        |
-| **렌더링 FPS**       | 120 FPS    | 120 FPS             | 동일 (Three.js WebGL)            |
-| **메모리 사용량**    | ~139MB     | ~44MB               | Pure JS가 메모리 효율적          |
-| **오디오 로딩 시간** | ~100-200ms | ~5ms                | Pure JS가 WAV 파싱만 수행        |
+| **FFT 처리 시간**    | ~0.33ms    | ~0.047ms            | Pure JS FFT가 약 7배 빠름        |
+| **프레임 시간**      | ~0.24ms    | ~0.40ms             | WASM이 약간 빠름                 |
+| **렌더링 FPS**       | 121 FPS    | 120 FPS             | 거의 동일 (Three.js WebGL)       |
+| **메모리 사용량**    | ~139MB     | ~11MB               | Pure JS가 매우 메모리 효율적     |
+| **오디오 로딩 시간** | ~100-200ms | ~4ms                | Pure JS가 WAV 파싱만 수행        |
 
 ### 성능 분석 요약
 
-#### WASM FFT가 Pure JavaScript DFT보다 빠른 이유
+#### Pure JavaScript FFT가 WASM FFT보다 빠른 이유
 
-WASM C++ FFT 구현이 Pure JavaScript DFT 구현보다 약 6.8배 빠른 성능을 보였습니다.
+Pure JavaScript FFT 구현이 WASM C++ FFT 구현보다 약 7배 빠른 성능을 보였습니다 (0.047ms vs 0.33ms).
 
-1. **최적화된 FFT 알고리즘**
+1. **동일한 FFT 알고리즘 사용**
 
-   - WASM: Cooley-Tukey FFT 알고리즘 (O(N log N))
-   - Pure JS: Direct DFT 계산 (O(N²))
-   - FFT 크기 2048의 경우 이론적으로 ~186배 더 효율적
+   - 둘 다 Cooley-Tukey FFT 알고리즘 (O(N log N)) 사용
+   - Pure JS: 순수 JavaScript로 구현한 최적화된 FFT
+   - WASM: dj_fft 라이브러리 사용
 
-2. **SIMD 최적화 및 네이티브 성능**
+2. **JavaScript V8 엔진의 최적화**
 
-   - WASM: dj_fft 라이브러리의 SIMD 최적화 활용
-   - 컴파일된 C++ 코드의 네이티브 속도
-   - WebAssembly SIMD 128-bit 명령어 지원
+   - 현대 JavaScript 엔진의 뛰어난 JIT 컴파일 최적화
+   - Float32Array 사용으로 메모리 연속성 확보
+   - 단순하고 직접적인 코드 구조가 JIT 최적화에 유리
 
-3. **사전 계산된 삼각함수 테이블**
-   - DFT: 모든 k*n 조합에 대한 cos/sin 테이블 사전 계산
-   - 하지만 O(N²) 복잡도로 인해 성능 한계
+3. **WASM 오버헤드**
 
-#### WASM의 장점
+   - WASM-JavaScript 간 데이터 복사 오버헤드
+   - 메모리 할당 및 관리 오버헤드
+   - 작은 FFT 크기(2048)에서는 오버헤드가 상대적으로 큼
 
-1. **뛰어난 FFT 성능**
+4. **사전 계산 최적화**
+   - Bit-reversal 테이블 사전 계산
+   - Twiddle factor (회전 인자) 사전 계산
+   - 반복적인 삼각함수 계산 완전 제거
 
-   - C++ 최적화 FFT 알고리즘으로 Pure JavaScript 대비 6.8배 빠른 처리
-   - SIMD 최적화를 통한 병렬 연산
-   - 실시간 오디오 처리에 적합
+#### 각 구현의 장단점
 
-2. **커스텀 알고리즘 구현 가능**
+**Pure JavaScript FFT:**
 
-   - dj_fft와 같은 고성능 C/C++ 라이브러리 활용
-   - 특화된 오디오 처리 로직 구현
-   - 복잡한 DSP 알고리즘 통합
+- ✅ 매우 빠른 FFT 처리 속도 (~0.047ms)
+- ✅ 매우 낮은 메모리 사용량 (~11MB)
+- ✅ 빠른 오디오 로딩 (~4ms)
+- ✅ 간단한 구현과 디버깅
+- ❌ 브라우저 JIT 성능에 따라 변동 가능
 
-3. **예측 가능한 성능**
-   - JavaScript JIT 컴파일러의 변동성 없이 일관된 성능
-   - 메모리 풀을 통한 안정적인 메모리 관리
+**WASM C++ FFT:**
+
+- ✅ 안정적이고 예측 가능한 성능
+- ✅ 더 빠른 전체 프레임 처리 시간
+- ✅ 복잡한 DSP 알고리즘 통합 가능
+- ❌ 더 많은 메모리 사용 (~139MB)
+- ❌ WASM 오버헤드로 인한 FFT 처리 시간 증가
 
 ### 참고 문서
 
