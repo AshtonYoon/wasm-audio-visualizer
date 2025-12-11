@@ -1,8 +1,8 @@
-import { PureFFT } from "./pure-fft.js";
+import { PureFFT } from "./pure-dft.js";
 import { Visualizer3D } from "./visualizer-3d.js";
 import { PerformanceMonitor } from "./performance-monitor.js";
 
-class PureJSFFTApp {
+class PureJSDFTApp {
   constructor() {
     // 오디오 데이터
     this.audioData = null; // Raw PCM 샘플
@@ -18,7 +18,7 @@ class PureJSFFTApp {
     this.visualizer = null;
     this.performanceMonitor = null;
 
-    // FFT 설정
+    // DFT 설정
     this.fftSize = 2048;
     this.fft = null;
     this.fftInput = null;
@@ -72,10 +72,10 @@ class PureJSFFTApp {
         };
       }
 
-      // FFT 초기화
-      console.log("FFT 초기화 중, 크기:", this.fftSize);
+      // DFT 초기화
+      console.log("DFT 초기화 중, 크기:", this.fftSize);
       this.initFFT(this.fftSize);
-      console.log("FFT 초기화 완료:", this.fft);
+      console.log("DFT 초기화 완료:", this.fft);
 
       // 이벤트 리스너 설정
       console.log("이벤트 리스너 설정 중...");
@@ -85,7 +85,7 @@ class PureJSFFTApp {
       document.getElementById("loading").classList.remove("active");
       this.updateStatus("준비 완료. 오디오 파일을 로드하세요.");
 
-      console.log("순수 JavaScript FFT 비주얼라이저 초기화 완료");
+      console.log("순수 JavaScript DFT 비주얼라이저 초기화 완료");
     } catch (error) {
       console.error("앱 초기화 실패:", error);
       console.error("에러 스택:", error.stack);
@@ -99,12 +99,12 @@ class PureJSFFTApp {
     this.fftInput = new Float32Array(size);
     this.fftOutput = this.fft.createComplexArray();
     this.frequencyData = new Uint8Array(size / 2);
-    console.log(`순수 JavaScript FFT 초기화 완료, 크기: ${size}`);
+    console.log(`순수 JavaScript DFT 초기화 완료, 크기: ${size}`);
   }
 
   setFFTSize(size) {
     this.initFFT(size);
-    console.log(`FFT 크기 변경: ${size}`);
+    console.log(`DFT 크기 변경: ${size}`);
   }
 
   setupEventListeners() {
@@ -120,7 +120,7 @@ class PureJSFFTApp {
       .getElementById("stop-btn")
       .addEventListener("click", () => this.stop());
 
-    // FFT 크기 컨트롤
+    // DFT 크기 컨트롤
     const fftSizeSelect = document.getElementById("fft-size");
     fftSizeSelect.addEventListener("change", (e) => {
       const size = parseInt(e.target.value);
@@ -356,7 +356,7 @@ class PureJSFFTApp {
     this.performanceMonitor.beginFrame();
 
     if (this.isPlaying && this.audioData) {
-      // JavaScript FFT를 사용하여 주파수 데이터 가져오기
+      // JavaScript DFT를 사용하여 주파수 데이터 가져오기
       this.performanceMonitor.beginFFT();
       const frequencyData = this.getFrequencyData();
       this.performanceMonitor.endFFT();
@@ -384,7 +384,7 @@ class PureJSFFTApp {
     // Raw PCM 데이터 사용
     const channelData = this.audioData;
 
-    // FFT용 샘플 추출
+    // DFT용 샘플 추출
     const numSamples = this.fftSize;
     if (sampleOffset + numSamples > channelData.length) {
       return null; // 샘플 부족
@@ -398,7 +398,7 @@ class PureJSFFTApp {
       this.fftInput[i] = channelData[sampleOffset + i] * windowValue;
     }
 
-    // FFT 수행
+    // DFT 수행
     this.fft.realTransform(this.fftOutput, this.fftInput);
 
     // 크기 계산
@@ -437,10 +437,10 @@ class PureJSFFTApp {
 // DOM 준비 시 앱 초기화
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
-    const app = new PureJSFFTApp();
+    const app = new PureJSDFTApp();
     app.init();
   });
 } else {
-  const app = new PureJSFFTApp();
+  const app = new PureJSDFTApp();
   app.init();
 }

@@ -192,6 +192,42 @@
           transform: rotate(360deg);
         }
       }
+
+      .nav-links {
+        margin-top: 20px;
+        padding: 15px;
+        background: #1a1a1a;
+        border-radius: 5px;
+        border: 1px solid #333;
+      }
+
+      .nav-links h3 {
+        font-size: 14px;
+        margin-bottom: 10px;
+        color: #f093fb;
+      }
+
+      .nav-links a {
+        display: block;
+        padding: 8px 12px;
+        margin-bottom: 5px;
+        background: #222;
+        border-radius: 5px;
+        color: #f093fb;
+        text-decoration: none;
+        font-size: 12px;
+        transition: background 0.2s;
+      }
+
+      .nav-links a:hover {
+        background: #333;
+      }
+
+      .nav-links a.current {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: #fff;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -199,7 +235,7 @@
       <div id="canvas-container"></div>
 
       <div id="controls">
-        <h1>🎵 Audio Visualizer</h1>
+        <h1>🎵 Audio Visualizer (FFT)</h1>
 
         <div class="file-input">
           <label for="audio-file">
@@ -274,6 +310,13 @@
             <span class="stat-label">Memory:</span>
             <span class="stat-value" id="memory-value">0.00 MB</span>
           </div>
+        </div>
+
+        <div class="nav-links">
+          <h3>🔗 Other Versions</h3>
+          <a href="index.html">WebAssembly Version</a>
+          <a href="pure-js-dft.html">Pure JS DFT (O(N²))</a>
+          <a href="pure-js-fft.html" class="current">Pure JS FFT (O(N log N))</a>
         </div>
 
         <div id="status">Ready. Load an audio file to begin.</div>

@@ -3,10 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WASM Audio Visualizer</title>
-
-    <!-- Service Worker for COOP/COEP headers (required for SharedArrayBuffer) -->
-    <script src="coi-serviceworker.js"></script>
+    <title>Pure JavaScript DFT Audio Visualizer</title>
 
     <style>
       * {
@@ -48,7 +45,7 @@
       h1 {
         font-size: 24px;
         margin-bottom: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
@@ -60,7 +57,7 @@
       .file-input label {
         display: block;
         padding: 12px 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         border-radius: 5px;
         cursor: pointer;
         text-align: center;
@@ -148,7 +145,7 @@
       #performance-stats h3 {
         font-size: 14px;
         margin-bottom: 10px;
-        color: #667eea;
+        color: #4facfe;
       }
 
       .stat-row {
@@ -179,7 +176,7 @@
 
       .spinner {
         border: 3px solid #333;
-        border-top: 3px solid #667eea;
+        border-top: 3px solid #4facfe;
         border-radius: 50%;
         width: 40px;
         height: 40px;
@@ -207,7 +204,7 @@
       .nav-links h3 {
         font-size: 14px;
         margin-bottom: 10px;
-        color: #667eea;
+        color: #4facfe;
       }
 
       .nav-links a {
@@ -216,7 +213,7 @@
         margin-bottom: 5px;
         background: #222;
         border-radius: 5px;
-        color: #667eea;
+        color: #4facfe;
         text-decoration: none;
         font-size: 12px;
         transition: background 0.2s;
@@ -227,7 +224,7 @@
       }
 
       .nav-links a.current {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         color: #fff;
         font-weight: bold;
       }
@@ -238,18 +235,18 @@
       <div id="canvas-container"></div>
 
       <div id="controls">
-        <h1>🎵 Audio Visualizer (WASM)</h1>
+        <h1>🎵 Audio Visualizer (DFT)</h1>
 
         <div class="file-input">
           <label for="audio-file">
             Choose WAV File
-            <input type="file" id="audio-file" accept="audio/*" />
+            <input type="file" id="audio-file" accept="audio/wav,.wav" />
           </label>
         </div>
 
         <div class="loading" id="loading">
           <div class="spinner"></div>
-          <div>Loading WASM module...</div>
+          <div>Loading...</div>
         </div>
 
         <div class="player-controls">
@@ -259,12 +256,11 @@
 
         <div class="settings">
           <div class="setting-item">
-            <label for="fft-size">FFT Size</label>
+            <label for="fft-size">DFT Size</label>
             <select id="fft-size">
-              <option value="1024">1024</option>
-              <option value="2048" selected>2048</option>
-              <option value="4096">4096</option>
-              <option value="8192">8192</option>
+              <option value="512">512</option>
+              <option value="1024" selected>1024</option>
+              <option value="2048">2048</option>
             </select>
           </div>
 
@@ -294,7 +290,7 @@
         </div>
 
         <div id="performance-stats">
-          <h3>⚡ Performance Metrics (WASM)</h3>
+          <h3>⚡ Performance Metrics (JS DFT)</h3>
           <div class="stat-row">
             <span class="stat-label">FPS:</span>
             <span class="stat-value" id="fps-value">0</span>
@@ -304,7 +300,7 @@
             <span class="stat-value" id="frame-time-value">0.00 ms</span>
           </div>
           <div class="stat-row">
-            <span class="stat-label">FFT Time:</span>
+            <span class="stat-label">DFT Time:</span>
             <span class="stat-value" id="fft-time-value">0.00 ms</span>
           </div>
           <div class="stat-row">
@@ -315,8 +311,8 @@
 
         <div class="nav-links">
           <h3>🔗 Other Versions</h3>
-          <a href="index.html" class="current">WebAssembly Version</a>
-          <a href="pure-js-dft.html">Pure JS DFT (O(N²))</a>
+          <a href="index.html">WebAssembly Version</a>
+          <a href="pure-js-dft.html" class="current">Pure JS DFT (O(N²))</a>
           <a href="pure-js-fft.html">Pure JS FFT (O(N log N))</a>
         </div>
 
@@ -324,6 +320,6 @@
       </div>
     </div>
 
-    <script type="module" src="./src/web/js/main.js"></script>
+    <script type="module" src="./src/web/js/pure-js-dft-main.js"></script>
   </body>
 </html>
