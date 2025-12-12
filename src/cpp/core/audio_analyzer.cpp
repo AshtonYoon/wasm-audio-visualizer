@@ -3,8 +3,9 @@
 #include <cmath>
 #include <complex>
 #include <wasm_simd128.h>
+#include <emscripten.h>
 
-// dj_fft 헤더 전용 라이브러리 포함 (CPU 버전만 지원, GPU 미지원)
+// dj_fft 헤더 전용 라이브러리 포함
 #include "dj_fft.h"
 
 namespace audio {
@@ -127,8 +128,15 @@ const float *AudioAnalyzer::analyze(const float *samples, size_t num_samples) {
   // SIMD 최적화된 윈도우 함수 적용 (큰 FFT 크기에서 4배 빠름)
   apply_window_simd(samples, window_.data(), complex_input.data(), fft_size_);
 
+  // FFT 연산 시간 측정 시작
+  double fft_start = emscripten_get_now();
+
   // dj::fft1d를 사용하여 FFT 수행 (dj_fft 라이브러리의 SIMD 최적화 활용)
   auto complex_output = dj::fft1d(complex_input, dj::fft_dir::DIR_FWD);
+
+  // FFT 연산 시간 측정 종료
+  double fft_end = emscripten_get_now();
+  last_fft_time_ms_ = fft_end - fft_start;
 
   // SIMD 최적화된 크기 계산 (4배 빠름)
   compute_magnitude_simd(complex_output.data(), magnitude_.data(),

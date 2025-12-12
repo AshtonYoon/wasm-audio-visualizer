@@ -126,4 +126,16 @@ const float* getSamples() {
     return samples.data();
 }
 
+/**
+ * 마지막 FFT 연산 시간 반환 (순수 FFT 연산만, 전처리/후처리 제외)
+ * 반환값: FFT 연산 시간 (밀리초)
+ */
+EMSCRIPTEN_KEEPALIVE
+double getLastFFTTime() {
+    if (!g_analyzer) {
+        return 0.0;
+    }
+    return g_analyzer->get_last_fft_time_ms();
+}
+
 } // extern "C"

@@ -27,10 +27,14 @@ public:
     // Set FFT size (reinitializes internal buffers)
     void set_fft_size(size_t size);
 
+    // Get last FFT computation time in milliseconds
+    double get_last_fft_time_ms() const { return last_fft_time_ms_; }
+
 private:
     size_t fft_size_;
     std::vector<float> magnitude_;
     std::vector<float> window_;
+    double last_fft_time_ms_ = 0.0;
 };
 
 } // namespace audio

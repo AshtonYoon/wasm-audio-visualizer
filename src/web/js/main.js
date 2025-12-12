@@ -32,6 +32,7 @@ class App {
       loadAudio: null,
       getBatchFFTData: null,
       getFFTDataAtOffset: null,
+      getLastFFTTime: null,
       malloc: null,
       free: null,
     };
@@ -77,6 +78,7 @@ class App {
     this.wasmFunctions.loadAudio = this.wasmModule._loadAudio;
     this.wasmFunctions.getBatchFFTData = this.wasmModule._getBatchFFTData;
     this.wasmFunctions.getFFTDataAtOffset = this.wasmModule._getFFTDataAtOffset;
+    this.wasmFunctions.getLastFFTTime = this.wasmModule._getLastFFTTime;
     this.wasmFunctions.malloc = this.wasmModule._malloc;
     this.wasmFunctions.free = this.wasmModule._free;
   }
@@ -297,6 +299,14 @@ class App {
     if (!fftPtr) {
       // WASM FFT 실패 시 Web Audio API로 폴백
       return this.audioPlayer.getFrequencyData();
+    }
+
+    // 순수 FFT 연산 시간 가져오기 (함수 호출 오버헤드 제외)
+    if (this.wasmFunctions.getLastFFTTime) {
+      const pureFFTTime = this.wasmFunctions.getLastFFTTime();
+      if (pureFFTTime > 0 && this.performanceMonitor) {
+        this.performanceMonitor.setPureWasmFftTime(pureFFTTime);
+      }
     }
 
     // WASM 메모리에서 FFT 데이터 복사
