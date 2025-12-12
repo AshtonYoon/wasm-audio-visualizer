@@ -260,7 +260,9 @@ class App {
       this.performanceMonitor.endFFT();
 
       if (wasmFrequencyData && this.visualizer) {
-        this.visualizer.updateFrequency(wasmFrequencyData);
+        const sampleRate = this.wasmFunctions.getSampleRate();
+        const fftSize = this.audioPlayer?.analyser?.fftSize || 2048;
+        this.visualizer.updateFrequency(wasmFrequencyData, sampleRate, fftSize);
       }
     }
 
