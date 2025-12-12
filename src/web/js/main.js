@@ -18,16 +18,22 @@ class App {
     this.avgMagnitudesBuffer = null;
     this.currentFFTSize = 0;
 
+    // FFT 데이터 스무딩을 위한 버퍼
+    this.smoothedFrequencyData = null;
+    this.smoothingFactor = 0.7; // 0.7 = 70% 이전 값, 30% 새 값 (부드러운 전환)
+    this.smoothedMaxMagnitude = 1.0; // 스무딩된 최대 크기 (정규화용)
+
     // 조회 오버헤드 방지를 위한 WASM 함수 참조 캐싱
     this.wasmFunctions = {
       getSampleCount: null,
       getSampleRate: null,
       getChannels: null,
+      getSamples: null,
+      loadAudio: null,
       getBatchFFTData: null,
       getFFTDataAtOffset: null,
       malloc: null,
       free: null,
-      loadPCMData: null,
     };
   }
 
@@ -67,11 +73,12 @@ class App {
     this.wasmFunctions.getSampleCount = this.wasmModule._getSampleCount;
     this.wasmFunctions.getSampleRate = this.wasmModule._getSampleRate;
     this.wasmFunctions.getChannels = this.wasmModule._getChannels;
+    this.wasmFunctions.getSamples = this.wasmModule._getSamples;
+    this.wasmFunctions.loadAudio = this.wasmModule._loadAudio;
     this.wasmFunctions.getBatchFFTData = this.wasmModule._getBatchFFTData;
     this.wasmFunctions.getFFTDataAtOffset = this.wasmModule._getFFTDataAtOffset;
     this.wasmFunctions.malloc = this.wasmModule._malloc;
     this.wasmFunctions.free = this.wasmModule._free;
-    this.wasmFunctions.loadPCMData = this.wasmModule._loadPCMData;
   }
 
   setupEventListeners() {
@@ -107,51 +114,50 @@ class App {
         `ArrayBuffer 로드 완료, 크기: ${arrayBuffer.byteLength} bytes`
       );
 
-      // Web Audio API로 디코딩 (모든 포맷 지원)
-      if (!this.audioPlayer.audioContext) {
-        this.audioPlayer.audioContext = new (window.AudioContext ||
-          window.webkitAudioContext)();
-      }
-
+      // WASM audio_decoder로 디코딩
       this.updateStatus(`${file.name} 디코딩 중...`);
-      console.log("Web Audio API로 디코딩 중...");
+      console.log("WASM audio_decoder로 디코딩 중...");
 
-      let audioBuffer;
-      try {
-        audioBuffer = await this.audioPlayer.audioContext.decodeAudioData(
-          arrayBuffer.slice(0)
-        );
-      } catch (decodeError) {
-        console.error("Web Audio API 디코드 에러:", decodeError);
-        throw new Error(
-          `${file.name} 디코딩 실패. 브라우저에서 지원하지 않는 포맷일 수 있습니다.`
-        );
-      }
+      // ArrayBuffer를 Uint8Array로 변환
+      const uint8Array = new Uint8Array(arrayBuffer);
 
-      console.log(
-        `✓ 디코딩 완료: ${file.name}, ${audioBuffer.duration.toFixed(2)}초, ${
-          audioBuffer.sampleRate
-        }Hz, ${audioBuffer.numberOfChannels}채널`
+      // WASM 메모리에 파일 데이터 복사
+      const dataPtr = this.wasmFunctions.malloc(uint8Array.length);
+      const heap = new Uint8Array(
+        this.wasmModule.HEAPU8.buffer,
+        dataPtr,
+        uint8Array.length
       );
+      heap.set(uint8Array);
 
-      // 시각화를 위해 PCM 데이터를 WASM에 로드
-      this.updateStatus(`WASM에 로딩 중...`);
-      const success = this.loadPCMToWasm(audioBuffer);
+      // WASM loadAudio 함수 호출
+      const success = this.wasmFunctions.loadAudio(dataPtr, uint8Array.length);
+
+      // 할당된 메모리 해제
+      this.wasmFunctions.free(dataPtr);
 
       if (!success) {
-        throw new Error("WASM 시각화 엔진에 오디오 데이터 로드 실패.");
+        throw new Error(`${file.name} 디코딩 실패. WAV 파일만 지원됩니다.`);
       }
 
-      console.log("✓ PCM 데이터를 WASM에 로드 완료");
-
-      // WASM에서 오디오 정보 가져오기 (캐시된 함수 참조 사용)
+      // WASM에서 오디오 정보 가져오기
       const sampleCount = this.wasmFunctions.getSampleCount();
       const sampleRate = this.wasmFunctions.getSampleRate();
       const channels = this.wasmFunctions.getChannels();
 
       console.log(
-        `WASM 로드 완료: ${sampleCount} 샘플, ${sampleRate} Hz, ${channels} 채널`
+        `✓ 디코딩 완료: ${file.name}, ${sampleCount} 샘플, ${sampleRate}Hz, ${channels}채널`
       );
+
+      // WASM에서 디코딩된 PCM 샘플을 가져와서 AudioBuffer 생성 (재생용)
+      this.updateStatus(`AudioBuffer 생성 중...`);
+      const audioBuffer = await this.createAudioBufferFromWasm(
+        sampleCount,
+        sampleRate,
+        channels
+      );
+
+      console.log("✓ AudioBuffer 생성 완료");
 
       // 재생을 위해 Web Audio API에 오디오 로드
       await this.audioPlayer.loadFromAudioBuffer(audioBuffer);
@@ -169,47 +175,40 @@ class App {
     }
   }
 
-  loadPCMToWasm(audioBuffer) {
-    try {
-      console.log("WASM에 PCM 로딩 중...");
-
-      // 채널 데이터 가져오기 (모노의 경우 첫 번째 채널 사용, 또는 모노로 믹스)
-      const channelData = audioBuffer.getChannelData(0);
-      const numSamples = channelData.length;
-
-      console.log(
-        `PCM 데이터: ${numSamples} 샘플, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}채널`
-      );
-
-      // WASM에 float32 배열을 위한 메모리 할당 (캐시된 함수 사용)
-      const dataPtr = this.wasmFunctions.malloc(numSamples * 4); // float당 4바이트
-      console.log(`포인터 ${dataPtr}에 ${numSamples * 4} 바이트 할당`);
-
-      // WASM 메모리에 PCM 데이터 복사
-      const offset = dataPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
-      for (let i = 0; i < numSamples; i++) {
-        this.wasmModule.HEAPF32[offset + i] = channelData[i];
-      }
-      console.log("PCM 데이터를 WASM 메모리에 복사 완료");
-
-      // PCM 데이터 로드를 위해 WASM 함수 호출 (캐시된 함수 사용)
-      const success = this.wasmFunctions.loadPCMData(
-        dataPtr,
-        numSamples,
-        audioBuffer.sampleRate,
-        audioBuffer.numberOfChannels
-      );
-
-      console.log(`WASM _loadPCMData 반환값: ${success}`);
-
-      // 할당된 메모리 해제 (캐시된 함수 사용)
-      this.wasmFunctions.free(dataPtr);
-
-      return success === 1;
-    } catch (error) {
-      console.error("WASM에 PCM 로드 에러:", error);
-      return false;
+  async createAudioBufferFromWasm(sampleCount, sampleRate, channels) {
+    // WASM에서 디코딩된 PCM 샘플 가져오기
+    const samplesPtr = this.wasmFunctions.getSamples();
+    if (!samplesPtr) {
+      throw new Error("WASM에서 샘플을 가져올 수 없습니다");
     }
+
+    // AudioContext 생성 (재생용)
+    if (!this.audioPlayer.audioContext) {
+      this.audioPlayer.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // AudioBuffer 생성
+    const audioBuffer = this.audioPlayer.audioContext.createBuffer(
+      channels,
+      sampleCount,
+      sampleRate
+    );
+
+    // WASM 메모리에서 PCM 데이터 읽기
+    const offset = samplesPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
+    const heapF32 = this.wasmModule.HEAPF32;
+
+    // 각 채널에 데이터 복사
+    for (let ch = 0; ch < channels; ch++) {
+      const channelData = audioBuffer.getChannelData(ch);
+      for (let i = 0; i < sampleCount; i++) {
+        // 인터리브된 데이터에서 채널별로 읽기
+        channelData[i] = heapF32[offset + i * channels + ch];
+      }
+    }
+
+    console.log("✓ AudioBuffer 생성 완료 (WASM PCM → AudioBuffer)");
+    return audioBuffer;
   }
 
   togglePlayPause() {
@@ -287,6 +286,7 @@ class App {
       this.currentFFTSize = fftSize;
       this.wasmFrequencyData = new Uint8Array(numBins);
       this.avgMagnitudesBuffer = new Float32Array(numBins);
+      this.smoothedFrequencyData = new Uint8Array(numBins);
     }
 
     // 단일 프레임 WASM FFT 함수 호출 (캐시된 함수 사용)
@@ -315,14 +315,27 @@ class App {
       }
     }
 
-    // 한 번에 정규화하고 0-255 범위로 변환
-    const scale = maxMagnitude > 0 ? 255 / maxMagnitude : 0;
+    // 최대 크기도 스무딩 적용 (급격한 스케일 변화 방지)
+    this.smoothedMaxMagnitude = this.smoothedMaxMagnitude * 0.9 + maxMagnitude * 0.1;
+
+    // 스무딩된 최대값으로 정규화 (0-255 범위)
+    const scale = this.smoothedMaxMagnitude > 0 ? 255 / this.smoothedMaxMagnitude : 0;
     for (let i = 0; i < numBins; i++) {
       const magnitude = heapF32[offset + i];
       this.wasmFrequencyData[i] = Math.min(255, Math.floor(magnitude * scale));
     }
 
-    return this.wasmFrequencyData;
+    // 시간적 스무딩 적용 (exponential smoothing)
+    // smoothed = old * smoothingFactor + new * (1 - smoothingFactor)
+    const inverseFactor = 1 - this.smoothingFactor;
+    for (let i = 0; i < numBins; i++) {
+      this.smoothedFrequencyData[i] = Math.floor(
+        this.smoothedFrequencyData[i] * this.smoothingFactor +
+        this.wasmFrequencyData[i] * inverseFactor
+      );
+    }
+
+    return this.smoothedFrequencyData;
   }
 
   updateStatus(message) {

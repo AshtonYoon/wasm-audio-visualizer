@@ -160,6 +160,23 @@ int getChannels() {
 }
 
 /**
+ * 디코딩된 PCM 샘플 데이터 포인터 반환
+ * Web Audio API AudioBuffer 생성을 위해 사용
+ * 반환값: float 샘플 배열 포인터 (크기는 getSampleCount()로 확인)
+ */
+EMSCRIPTEN_KEEPALIVE
+const float* getSamples() {
+    if (!g_decoder || !g_decoder->is_loaded()) {
+        return nullptr;
+    }
+    const auto& samples = g_decoder->samples();
+    if (samples.empty()) {
+        return nullptr;
+    }
+    return samples.data();
+}
+
+/**
  * WASM 리소스 정리 (메모리 해제)
  */
 EMSCRIPTEN_KEEPALIVE
