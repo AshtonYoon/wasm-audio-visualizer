@@ -13,13 +13,12 @@
 ### 프로젝트 개요
 
 C++ WebAssembly 기반 실시간 3D 오디오 시각화 애플리케이션입니다.
-Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, dj_fft 라이브러리로 FFT (Fast Fourier Transform) 분석을 수행하며, Three.js를 통해 3D 시각화를 구현합니다.
+Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, cooley-turkey 알고리즘으로 FFT (Fast Fourier Transform) 분석을 수행하며, Three.js를 통해 3D 시각화를 구현합니다.
 
 ### 핵심 기술 스택
 
 - **C++20** - 오디오 처리 핵심 로직
 - **Emscripten 4.0** - WebAssembly 컴파일 툴체인
-- **dj_fft** - SIMD 최적화 FFT 라이브러리 (header-only)
 - **Three.js** - WebGL 기반 3D 렌더링
 - **Web Audio API** - 오디오 재생 및 분석
 - **Vite** - 개발 서버 및 빌드 도구
@@ -35,12 +34,10 @@ Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, dj_fft 
 2. **SIMD 최적화**
 
    - `-msimd128` 플래그를 통한 WebAssembly SIMD 128-bit 명령어 활용
-   - dj_fft의 SIMD 최적화 FFT 알고리즘
    - **SIMD 사용 코드 위치:**
      - `CMakeLists.txt:29-30, 35` - 컴파일 플래그 설정
      - `audio_analyzer.cpp:17-39` - `apply_window_simd()` - 4개 float 동시 처리 (윈도우 함수 적용)
      - `audio_analyzer.cpp:45-81` - `compute_magnitude_simd()` - 4개 복소수 동시 처리 (크기 계산)
-     - `dj_fft.h` - FFT 연산 자체에 SIMD 최적화 내장
 
 3. **인터랙티브 컨트롤**
 
@@ -169,7 +166,6 @@ npm run clean
 주요 구현 내용:
 
 - FFT 분석 엔진 (audio_analyzer.cpp)
-  - dj_fft 라이브러리 통합
   - SIMD 최적화 적용
   - 주파수 스펙트럼 분석
 - 오디오 디코더 (audio_decoder.cpp)
@@ -269,6 +265,5 @@ wasm-audio-visualizer/
 
 ## 크레딧
 
-- [dj_fft](https://github.com/jdupuy/dj_fft) by Jonathan Dupuy - SIMD 최적화 FFT 라이브러리
 - [Emscripten](https://emscripten.org/) - WebAssembly 툴체인
 - [Three.js](https://threejs.org/) - 3D 라이브러리
