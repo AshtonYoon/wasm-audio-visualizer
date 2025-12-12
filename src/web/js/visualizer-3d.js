@@ -11,17 +11,17 @@ export class Visualizer3D {
     this.spectrumBars = null;
     this.spectrumGroup = null;
     this.colorScheme = "purple";
-    this.sensitivity = 1.0;
+    this.sensitivity = 3.0;
 
     // 로그 스케일 주파수 매핑 설정
-    this.minFreq = 20;        // 최소 주파수 (Hz)
-    this.maxFreq = 20000;     // 최대 주파수 (Hz)
-    this.sampleRate = 48000;  // 샘플레이트 (동적으로 업데이트)
-    this.fftSize = 2048;      // FFT 크기 (동적으로 업데이트)
+    this.minFreq = 20; // 최소 주파수 (Hz)
+    this.maxFreq = 20000; // 최대 주파수 (Hz)
+    this.sampleRate = 48000; // 샘플레이트 (동적으로 업데이트)
+    this.fftSize = 2048; // FFT 크기 (동적으로 업데이트)
 
     // 동적 범위 압축 (dB) 설정
-    this.minDb = -60;         // 최소 dB (노이즈 플로어)
-    this.maxDb = 0;           // 최대 dB
+    this.minDb = -60; // 최소 dB (노이즈 플로어)
+    this.maxDb = 0; // 최대 dB
 
     this.init();
   }

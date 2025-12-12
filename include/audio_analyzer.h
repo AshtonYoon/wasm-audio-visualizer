@@ -7,7 +7,7 @@
 namespace audio {
 
 /**
- * FFT-based audio analyzer using dj_fft
+ * FFT-based audio analyzer using Cooley-Tukey algorithm
  */
 class AudioAnalyzer {
 public:
@@ -31,10 +31,19 @@ public:
     double get_last_fft_time_ms() const { return last_fft_time_ms_; }
 
 private:
+    // FFT helper methods
+    void init_fft_tables();
+    void compute_fft(std::vector<std::complex<float>>& data);
+
     size_t fft_size_;
     std::vector<float> magnitude_;
     std::vector<float> window_;
     double last_fft_time_ms_ = 0.0;
+
+    // FFT precomputed tables
+    std::vector<uint32_t> bit_reversed_;
+    std::vector<float> twiddle_cos_;
+    std::vector<float> twiddle_sin_;
 };
 
 } // namespace audio

@@ -20,7 +20,7 @@ class App {
 
     // FFT 데이터 스무딩을 위한 버퍼
     this.smoothedFrequencyData = null;
-    this.smoothingFactor = 0.7; // 0.7 = 70% 이전 값, 30% 새 값 (부드러운 전환)
+    this.smoothingFactor = 0.3; // 0.3 = 30% 이전 값, 70% 새 값 (부드러운 전환)
     this.smoothedMaxMagnitude = 1.0; // 스무딩된 최대 크기 (정규화용)
 
     // 조회 오버헤드 방지를 위한 WASM 함수 참조 캐싱
@@ -186,7 +186,8 @@ class App {
 
     // AudioContext 생성 (재생용)
     if (!this.audioPlayer.audioContext) {
-      this.audioPlayer.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.audioPlayer.audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
     }
 
     // AudioBuffer 생성
@@ -302,12 +303,12 @@ class App {
     }
 
     // 순수 FFT 연산 시간 가져오기 (함수 호출 오버헤드 제외)
-    if (this.wasmFunctions.getLastFFTTime) {
-      const pureFFTTime = this.wasmFunctions.getLastFFTTime();
-      if (pureFFTTime > 0 && this.performanceMonitor) {
-        this.performanceMonitor.setPureWasmFftTime(pureFFTTime);
-      }
-    }
+    // if (this.wasmFunctions.getLastFFTTime) {
+    //   const pureFFTTime = this.wasmFunctions.getLastFFTTime();
+    //   if (pureFFTTime > 0 && this.performanceMonitor) {
+    //     this.performanceMonitor.setPureWasmFftTime(pureFFTTime);
+    //   }
+    // }
 
     // WASM 메모리에서 FFT 데이터 복사
     const offset = fftPtr / 4; // HEAPF32는 float 단위로 인덱싱됨
@@ -328,10 +329,12 @@ class App {
     }
 
     // 최대 크기도 스무딩 적용 (급격한 스케일 변화 방지)
-    this.smoothedMaxMagnitude = this.smoothedMaxMagnitude * 0.9 + maxMagnitude * 0.1;
+    this.smoothedMaxMagnitude =
+      this.smoothedMaxMagnitude * 0.9 + maxMagnitude * 0.1;
 
     // 스무딩된 최대값으로 정규화 (0-255 범위)
-    const scale = this.smoothedMaxMagnitude > 0 ? 255 / this.smoothedMaxMagnitude : 0;
+    const scale =
+      this.smoothedMaxMagnitude > 0 ? 255 / this.smoothedMaxMagnitude : 0;
     for (let i = 0; i < numBins; i++) {
       const magnitude = heapF32[offset + i];
       this.wasmFrequencyData[i] = Math.min(255, Math.floor(magnitude * scale));
@@ -343,7 +346,7 @@ class App {
     for (let i = 0; i < numBins; i++) {
       this.smoothedFrequencyData[i] = Math.floor(
         this.smoothedFrequencyData[i] * this.smoothingFactor +
-        this.wasmFrequencyData[i] * inverseFactor
+          this.wasmFrequencyData[i] * inverseFactor
       );
     }
 

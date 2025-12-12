@@ -5,9 +5,6 @@
 #include <wasm_simd128.h>
 #include <emscripten.h>
 
-// dj_fft 헤더 전용 라이브러리 포함
-#include "dj_fft.h"
-
 namespace audio {
 
 // SIMD 최적화된 윈도우 함수 적용 (4개 float를 동시에 처리)
@@ -81,6 +78,85 @@ inline void compute_magnitude_simd(const std::complex<float> *complex_data,
   }
 }
 
+// Bit-reversal 테이블과 Twiddle factor 사전 계산
+// FFT는 Cooley-Tukey 알고리즘 사용
+void AudioAnalyzer::init_fft_tables() {
+  const size_t n = fft_size_;
+  const size_t log2n = static_cast<size_t>(std::log2(n));
+
+  // Bit-reversal 테이블 계산
+  bit_reversed_.resize(n);
+  for (size_t i = 0; i < n; ++i) {
+    uint32_t reversed = 0;
+    uint32_t temp = i;
+
+    for (size_t j = 0; j < log2n; ++j) {
+      reversed = (reversed << 1) | (temp & 1);
+      temp >>= 1;
+    }
+
+    bit_reversed_[i] = reversed;
+  }
+
+  // Twiddle factors 사전 계산
+  // W_N^k = e^(-2πik/N) = cos(2πk/N) - i*sin(2πk/N)
+  twiddle_cos_.resize(n / 2);
+  twiddle_sin_.resize(n / 2);
+
+  for (size_t k = 0; k < n / 2; ++k) {
+    const float angle = -2.0f * M_PI * k / n;
+    twiddle_cos_[k] = std::cos(angle);
+    twiddle_sin_[k] = std::sin(angle);
+  }
+}
+
+// Cooley-Tukey FFT 알고리즘 구현
+// 시간 복잡도: O(N log N)
+void AudioAnalyzer::compute_fft(std::vector<std::complex<float>>& data) {
+  const size_t n = data.size();
+
+  // 1단계: Bit-reversal 순서로 입력 재배치
+  std::vector<std::complex<float>> temp(n);
+  for (size_t i = 0; i < n; ++i) {
+    temp[bit_reversed_[i]] = data[i];
+  }
+  data = std::move(temp);
+
+  // 2단계: Butterfly 연산 수행 (log2(N) 스테이지)
+  for (size_t len = 2; len <= n; len *= 2) {
+    const size_t half_len = len / 2;
+    const size_t angle_step = n / len;
+
+    // 각 블록에 대해
+    for (size_t i = 0; i < n; i += len) {
+      // 블록 내의 각 쌍에 대해 butterfly 연산
+      for (size_t j = 0; j < half_len; ++j) {
+        const size_t k = i + j;
+        const size_t l = i + j + half_len;
+
+        // Twiddle factor
+        const size_t twiddle_idx = j * angle_step;
+        const float twiddle_real = twiddle_cos_[twiddle_idx];
+        const float twiddle_imag = twiddle_sin_[twiddle_idx];
+
+        // 복소수 곱셈: t = twiddle * data[l]
+        const float out_l_real = data[l].real();
+        const float out_l_imag = data[l].imag();
+
+        const float t_real = twiddle_real * out_l_real - twiddle_imag * out_l_imag;
+        const float t_imag = twiddle_real * out_l_imag + twiddle_imag * out_l_real;
+
+        // Butterfly 연산
+        const float out_k_real = data[k].real();
+        const float out_k_imag = data[k].imag();
+
+        data[k] = std::complex<float>(out_k_real + t_real, out_k_imag + t_imag);
+        data[l] = std::complex<float>(out_k_real - t_real, out_k_imag - t_imag);
+      }
+    }
+  }
+}
+
 // FFT 분석기 생성자
 // fft_size: FFT 크기 (2의 거듭제곱, 예: 512, 1024, 2048)
 AudioAnalyzer::AudioAnalyzer(size_t fft_size) : fft_size_(fft_size) {
@@ -91,6 +167,9 @@ AudioAnalyzer::AudioAnalyzer(size_t fft_size) : fft_size_(fft_size) {
   for (size_t i = 0; i < fft_size; ++i) {
     window_[i] = 0.5f * (1.0f - std::cos(2.0f * M_PI * i / (fft_size - 1)));
   }
+
+  // FFT 테이블 초기화
+  init_fft_tables();
 }
 
 AudioAnalyzer::~AudioAnalyzer() = default;
@@ -109,6 +188,9 @@ void AudioAnalyzer::set_fft_size(size_t size) {
   for (size_t i = 0; i < size; ++i) {
     window_[i] = 0.5f * (1.0f - std::cos(2.0f * M_PI * i / (size - 1)));
   }
+
+  // FFT 테이블 재초기화
+  init_fft_tables();
 }
 
 // FFT 분석 수행
@@ -122,7 +204,7 @@ const float *AudioAnalyzer::analyze(const float *samples, size_t num_samples) {
     return magnitude_.data();
   }
 
-  // dj::fft1d를 위한 복소수 입력 준비
+  // FFT를 위한 복소수 입력 준비
   std::vector<std::complex<float>> complex_input(fft_size_);
 
   // SIMD 최적화된 윈도우 함수 적용 (큰 FFT 크기에서 4배 빠름)
@@ -131,15 +213,15 @@ const float *AudioAnalyzer::analyze(const float *samples, size_t num_samples) {
   // FFT 연산 시간 측정 시작
   double fft_start = emscripten_get_now();
 
-  // dj::fft1d를 사용하여 FFT 수행 (dj_fft 라이브러리의 SIMD 최적화 활용)
-  auto complex_output = dj::fft1d(complex_input, dj::fft_dir::DIR_FWD);
+  // Cooley-Tukey 알고리즘을 사용하여 FFT 수행
+  compute_fft(complex_input);
 
   // FFT 연산 시간 측정 종료
   double fft_end = emscripten_get_now();
   last_fft_time_ms_ = fft_end - fft_start;
 
   // SIMD 최적화된 크기 계산 (4배 빠름)
-  compute_magnitude_simd(complex_output.data(), magnitude_.data(),
+  compute_magnitude_simd(complex_input.data(), magnitude_.data(),
                          fft_size_ / 2);
 
   return magnitude_.data();

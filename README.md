@@ -227,55 +227,18 @@ npm run clean
 
 - **CPU**: Apple M4
 - **브라우저**: Chrome 131
-- **오디오 파일**: piano2.wav (WAV, 48kHz, Stereo)
+- **오디오 파일**: WAV, 48kHz, Stereo, 46.5MB (46493696 bytes)
 - **FFT 크기**: 2048
-- **측정 방식**: 60 프레임 평균값 (15초 재생 후 측정)
+- **측정 방식**: 30초 재생 평균값
 - **측정 도구**: chrome-devtools MCP
 
 ### 성능 비교 (WASM vs Pure JavaScript)
 
-| 측정 항목                  | WASM (C++)    | Pure JavaScript FFT | 비고                                                                           |
-| -------------------------- | ------------- | ------------------- | ------------------------------------------------------------------------------ |
-| **FFT 처리 시간 (Total)**  | ~1.129ms      | ~0.049ms            | Pure JS FFT가 약 23배 빠름 (JS 오버헤드 포함)                                 |
-| **FFT 처리 시간 (Pure)**   | ~1.012ms      | N/A                 | 순수 WASM FFT 연산 시간 (전처리/후처리 제외)                                  |
-| **렌더링 FPS**             | 120 FPS       | 120 FPS             | 양쪽 모두 한 프레임당 작업시간이 8.3ms 이내로 처리되기 때문에 최고 프레임 유지 |
-| **메모리 사용량**          | ~269.35MB     | ~9.74MB             | Pure JS가 약 28배 메모리 효율적                                                |
-
-### 성능 분석 요약
-
-#### Pure JavaScript FFT가 WASM FFT보다 빠른 이유
-
-Pure JavaScript FFT 구현이 WASM C++ FFT 구현보다 약 23배 빠른 성능을 보였습니다 (0.049ms vs 1.129ms).
-
-**주요 발견:**
-- **순수 FFT 연산 시간**: WASM에서 측정한 순수 FFT 연산 시간은 1.012ms로, 전체 FFT 처리 시간(1.129ms)의 대부분을 차지
-- **JavaScript 오버헤드**: WASM-JavaScript 간 데이터 전달, 메모리 복사 등의 오버헤드는 0.117ms(약 10%)
-- **메모리 효율**: Pure JS FFT는 9.74MB로 WASM 버전(269.35MB)보다 약 28배 적은 메모리 사용
-
-1. **동일한 FFT 알고리즘 사용**
-
-   - 둘 다 Cooley-Tukey FFT 알고리즘 (O(N log N)) 사용
-   - Pure JS: 순수 JavaScript로 구현한 최적화된 FFT
-   - WASM: dj_fft 라이브러리 사용
-
-2. **JavaScript V8 엔진의 최적화**
-
-   - 현대 JavaScript 엔진의 뛰어난 JIT 컴파일 최적화
-   - Float32Array 사용으로 메모리 연속성 확보
-   - 단순하고 직접적인 코드 구조가 JIT 최적화에 유리
-
-3. **WASM 오버헤드**
-
-   - WASM-JavaScript 간 데이터 복사 오버헤드
-   - 메모리 할당 및 관리 오버헤드
-   - 작은 FFT 크기(2048)에서는 오버헤드가 상대적으로 큼
-
-4. **사전 계산 최적화**
-   - Bit-reversal 테이블 사전 계산
-   - Twiddle factor (회전 인자) 사전 계산
-   - 반복적인 삼각함수 계산 완전 제거
-
----
+| 측정 항목                 | WASM (C++) | Pure JavaScript FFT | 비고                                                                           |
+| ------------------------- | ---------- | ------------------- | ------------------------------------------------------------------------------ |
+| **FFT 처리 시간 (Total)** | ~1.682ms   | ~2.567ms            | WASM가 약 1.52배 빠름 (JS 오버헤드 포함)                                       |
+| **렌더링 FPS**            | 120 FPS    | 120 FPS             | 양쪽 모두 한 프레임당 작업시간이 8.3ms 이내로 처리되기 때문에 최고 프레임 유지 |
+| **메모리 사용량**         | ~519.35MB  | ~126.86MB           | Pure JS 메모리 사용량이 약 4.3배 정도 적음                                     |
 
 ## 프로젝트 구조
 
@@ -296,8 +259,6 @@ wasm-audio-visualizer/
 │   │       ├── visualizer-3d.js       # 3D 시각화
 │   │       ├── ui-controls.js         # UI 컨트롤
 │   │       └── performance-monitor.js # 성능 모니터
-│   └── third_party/
-│       └── dj_fft/                    # FFT 라이브러리
 ├── include/                    # C++ 헤더
 ├── build/                      # CMake 빌드 출력
 ├── public/                     # 정적 파일
