@@ -20,8 +20,12 @@ class App {
 
     // FFT 데이터 스무딩을 위한 버퍼
     this.smoothedFrequencyData = null;
-    this.smoothingFactor = 0.3; // 0.3 = 30% 이전 값, 70% 새 값 (부드러운 전환)
+    this.smoothingFactor = 0.7; // 0.7 = 70% 이전 값, 30% 새 값 (부드러운 전환)
     this.smoothedMaxMagnitude = 1.0; // 스무딩된 최대 크기 (정규화용)
+
+    // 레이턴시 보정을 위한 변수
+    this.lookAheadMs = 15; // 미래 시점 예측 (ms) - 동적으로 조정됨
+    this.lastFFTDuration = 0; // 마지막 FFT 계산 시간
 
     // 조회 오버헤드 방지를 위한 WASM 함수 참조 캐싱
     this.wasmFunctions = {
@@ -190,10 +194,13 @@ class App {
         window.webkitAudioContext)();
     }
 
+    // sampleCount는 인터리브된 전체 샘플 수이므로 채널 수로 나눠서 프레임 수를 구함
+    const framesCount = Math.floor(sampleCount / channels);
+
     // AudioBuffer 생성
     const audioBuffer = this.audioPlayer.audioContext.createBuffer(
       channels,
-      sampleCount,
+      framesCount,
       sampleRate
     );
 
@@ -204,7 +211,7 @@ class App {
     // 각 채널에 데이터 복사
     for (let ch = 0; ch < channels; ch++) {
       const channelData = audioBuffer.getChannelData(ch);
-      for (let i = 0; i < sampleCount; i++) {
+      for (let i = 0; i < framesCount; i++) {
         // 인터리브된 데이터에서 채널별로 읽기
         channelData[i] = heapF32[offset + i * channels + ch];
       }
@@ -274,6 +281,8 @@ class App {
 
   getWasmFrequencyData() {
     if (!this.wasmModule || !this.audioPlayer) return null;
+
+    const fftStartTime = performance.now();
 
     // 현재 재생 시간을 샘플 오프셋으로 변환 (캐시된 함수 사용)
     const currentTime = this.audioPlayer.getCurrentTime();
@@ -349,6 +358,14 @@ class App {
           this.wasmFrequencyData[i] * inverseFactor
       );
     }
+
+    // FFT 계산 시간 측정 및 동적 look-ahead 조정
+    const fftEndTime = performance.now();
+    this.lastFFTDuration = fftEndTime - fftStartTime;
+
+    // 동적 look-ahead: FFT 시간의 2배 + 여유분 (exponential smoothing)
+    const targetLookAhead = Math.max(10, this.lastFFTDuration * 2 + 5);
+    this.lookAheadMs = this.lookAheadMs * 0.8 + targetLookAhead * 0.2;
 
     return this.smoothedFrequencyData;
   }
