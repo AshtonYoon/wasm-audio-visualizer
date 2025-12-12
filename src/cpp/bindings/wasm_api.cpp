@@ -169,4 +169,19 @@ void cleanup() {
     printf("WASM 리소스 정리 완료\n");
 }
 
+/**
+ * SIMD 활성화 여부 확인
+ * 반환값: SIMD가 활성화되었으면 1, 아니면 0
+ */
+EMSCRIPTEN_KEEPALIVE
+int isSIMDEnabled() {
+#ifdef __wasm_simd128__
+    printf("✓ SIMD (WebAssembly SIMD128) 활성화됨\n");
+    return 1;
+#else
+    printf("✗ SIMD 비활성화됨\n");
+    return 0;
+#endif
+}
+
 } // extern "C"

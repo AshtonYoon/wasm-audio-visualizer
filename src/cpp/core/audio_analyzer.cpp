@@ -2,21 +2,13 @@
 #include <cmath>
 #include <algorithm>
 #include <complex>
+#include <wasm_simd128.h>
 
 // dj_fft 헤더 전용 라이브러리 포함 (CPU 버전만 지원, GPU 미지원)
 #include "dj_fft.h"
 
-// WebAssembly SIMD 지원 감지
-#ifdef __wasm_simd128__
-#include <wasm_simd128.h>
-#define SIMD_ENABLED 1
-#else
-#define SIMD_ENABLED 0
-#endif
-
 namespace audio {
 
-#if SIMD_ENABLED
 // SIMD 최적화된 윈도우 함수 적용 (4개 float를 동시에 처리)
 // samples: 입력 샘플 배열
 // window: 윈도우 함수 배열 (Hann, Hamming 등)
@@ -87,7 +79,6 @@ inline void compute_magnitude_simd(const std::complex<float>* complex_data,
         magnitude[i] = std::sqrt(real * real + imag * imag);
     }
 }
-#endif
 
 // FFT 분석기 생성자
 // fft_size: FFT 크기 (2의 거듭제곱, 예: 512, 1024, 2048)
@@ -133,30 +124,14 @@ const float* AudioAnalyzer::analyze(const float* samples, size_t num_samples) {
     // dj::fft1d를 위한 복소수 입력 준비
     std::vector<std::complex<float>> complex_input(fft_size_);
 
-#if SIMD_ENABLED
     // SIMD 최적화된 윈도우 함수 적용 (큰 FFT 크기에서 4배 빠름)
     apply_window_simd(samples, window_.data(), complex_input.data(), fft_size_);
-#else
-    // 스칼라 fallback (SIMD 미지원 시)
-    for (size_t i = 0; i < fft_size_; ++i) {
-        complex_input[i] = std::complex<float>(samples[i] * window_[i], 0.0f);
-    }
-#endif
 
     // dj::fft1d를 사용하여 FFT 수행 (dj_fft 라이브러리의 SIMD 최적화 활용)
     auto complex_output = dj::fft1d(complex_input, dj::fft_dir::DIR_FWD);
 
-#if SIMD_ENABLED
     // SIMD 최적화된 크기 계산 (4배 빠름)
     compute_magnitude_simd(complex_output.data(), magnitude_.data(), fft_size_ / 2);
-#else
-    // 스칼라 fallback: 크기 스펙트럼 계산 (절반만, 나머지는 대칭)
-    for (size_t i = 0; i < fft_size_ / 2; ++i) {
-        float real = complex_output[i].real();
-        float imag = complex_output[i].imag();
-        magnitude_[i] = std::sqrt(real * real + imag * imag);
-    }
-#endif
 
     return magnitude_.data();
 }
