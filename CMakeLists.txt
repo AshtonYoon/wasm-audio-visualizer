@@ -38,7 +38,7 @@ if(EMSCRIPTEN)
         "-s ALLOW_MEMORY_GROWTH=1"
         "-s INITIAL_MEMORY=268435456"
         "-s MAXIMUM_MEMORY=1073741824"
-        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_loadPCMData','_getFFTData','_getFFTDataAtOffset','_getSampleCount','_getSampleRate','_getChannels','_getSamples','_cleanup','_isSIMDEnabled']"
+        "-s EXPORTED_FUNCTIONS=['_malloc','_free','_loadAudio','_getFFTDataAtOffset','_getSampleCount','_getSampleRate','_getChannels','_getSamples']"
         "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','HEAP8','HEAPU8','HEAPF32','writeArrayToMemory']"
         "-gsource-map"
         "--source-map-base=http://localhost:8000/"

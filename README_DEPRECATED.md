@@ -7,7 +7,7 @@ C++ WebAssembly based 3D audio visualizer using Emscripten, dj_fft, and Three.js
 - 🎵 WAV audio file support (more formats coming with FFmpeg integration)
 - 🌊 Real-time 3D waveform surface visualization
 - 📊 FFT-based frequency analysis using dj_fft
-- ⚡ SIMD and multithreading optimizations
+- SIMD and multithreading optimizations
 - 🎮 Interactive camera controls (orbit, zoom, pan)
 - 🎨 Customizable visual settings (color schemes, sensitivity)
 - 🎧 Web Audio API playback with real-time analysis
