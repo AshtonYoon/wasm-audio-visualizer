@@ -38,9 +38,8 @@ Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, dj_fft 
    - dj_fft의 SIMD 최적화 FFT 알고리즘
    - **SIMD 사용 코드 위치:**
      - `CMakeLists.txt:29-30, 35` - 컴파일 플래그 설정
-     - `audio_analyzer.cpp:10-15` - SIMD 지원 감지 (`__wasm_simd128__`)
-     - `audio_analyzer.cpp:21-43` - `apply_window_simd()` - 4개 float 동시 처리 (윈도우 함수 적용)
-     - `audio_analyzer.cpp:46-82` - `compute_magnitude_simd()` - 4개 복소수 동시 처리 (크기 계산)
+     - `audio_analyzer.cpp:17-39` - `apply_window_simd()` - 4개 float 동시 처리 (윈도우 함수 적용)
+     - `audio_analyzer.cpp:45-81` - `compute_magnitude_simd()` - 4개 복소수 동시 처리 (크기 계산)
      - `dj_fft.h` - FFT 연산 자체에 SIMD 최적화 내장
 
 3. **인터랙티브 컨트롤**
@@ -115,9 +114,9 @@ npm run clean
 
 | 이름   | 담당 역할 | 주요 구현 내용                                                                 |
 | ------ | --------- | ------------------------------------------------------------------------------ |
-| 김태경 | 팀장      | 메모리 풀, SIMD 최적화, 빌드 시스템, 성능 벤치마킹                             |
+| 김태경 | 팀장      | SIMD 최적화, 빌드 시스템, 성능 벤치마킹                                        |
 | 윤여환 | 팀원      | Three.js 3D 시각화, UI 컨트롤, 성능 모니터, Pure JS 버전 구현, WASM API 바인딩 |
-| 이재영 | 팀원      | FFT 분석 엔진, 오디오 디코더, 버퍼 관리                                        |
+| 이재영 | 팀원      | FFT 분석 엔진, 오디오 디코더                                                   |
 
 ---
 
@@ -141,7 +140,7 @@ npm run clean
 - Pure JavaScript 버전 구현 (pure-js.html, pure-js-main.js)
 - WASM API 바인딩 (wasm_api.cpp)
   - JavaScript와 통신하는 API 함수
-  - loadPCMData(), getFFTData() 등
+  - loadAudio(), getFFTData() 등
 
 ---
 
@@ -151,10 +150,6 @@ npm run clean
 
 주요 구현 내용:
 
-- 메모리 관리 (memory_pool.cpp)
-  - Memory Pool 구현
-  - malloc/free 최적화
-  - 메모리 누수 방지
 - SIMD 최적화
   - -msimd128 플래그 설정
   - 벡터화 연산 최적화
@@ -180,9 +175,6 @@ npm run clean
 - 오디오 디코더 (audio_decoder.cpp)
   - WAV 파일 파싱 및 디코딩
   - PCM 데이터 추출
-- 오디오 버퍼 관리 (audio_buffer.cpp)
-  - 순환 버퍼 구현
-  - 실시간 데이터 스트리밍
 
 ## 5. 개발 중 어려웠던 점과 해결 방법
 
@@ -192,36 +184,27 @@ npm run clean
 
 - Emscripten 툴체인 설치 및 환경 설정의 복잡성
   - emsdk 설치 경로 및 환경 변수 설정
-  - 빌드 시스템 통합의 어려움
 - CMake 빌드 시스템과 Emscripten의 통합
-  - C++ 컴파일러가 아닌 emcc를 사용해야 하는 제약
+  - 생소한 빌드 스크립트 작성 방법
 
 ### 5.2 WASM ↔ JavaScript 데이터 전달
 
 **어려웠던 점:**
 
-- **JS-WASM 함수 호출 오버헤드**
-  - 매 프레임 FFT 호출 시 성능 저하
-  - 함수 호출 자체의 비용
-- **TypedArray 복사 로직**
-  - JavaScript에서 WASM 메모리로 오디오 데이터 복사
-  - WASM에서 JavaScript로 FFT 결과 복사
-  - Float32Array 변환 비용
-- **메모리 관리 및 누수 방지**
-  - 매 프레임마다 메모리 할당이 필요함
-    - 오디오 시각화 → 120 FPS
-    - → 매 프레임마다 FFT 실행
-    - → 매번 메모리 할당/해제 필요
-    - 일반 malloc/free 사용 시:
-    - 초당 120번 × malloc() + free() = 초당 240번의 시스템 콜
-      - → 느림 💀
+- 오디오 파일 시각화 전반의 흐름 파악이 어려웠음
 
 **해결 방법:**
 
-- **Memory Pool 구현 (`memory_pool.cpp`)**
+- 구현 이전 각 레이어의 역할 분리, 흐름도 작성
 
-  - 미리 할당된 메모리 풀에서 재사용
-  - malloc/free 호출 횟수 최소화
+1. `[js]` 파일 선택
+2. `[js]` ArrayBuffer로 읽기
+3. `[wasm]` 메모리에 복사 (malloc)
+4. `[wasm]` loadAudio() 호출 (WAV 디코딩)
+5. `[wasm]` 메모리 해제 (free)
+6. `[wasm]` getSamples()로 PCM 데이터 가져오기
+7. `[wasm]` createAudioBufferFromWasm()로 AudioBuffer 생성
+8. `[js]` AudioPlayer에 로드 (재생용)
 
 ## 6. 가산점 항목
 
@@ -230,7 +213,7 @@ npm run clean
 - **두 가지 구현 버전 제공**
 
   - WASM 버전 (`index.html`): C++ FFT with SIMD
-  - Pure JavaScript 버전 (`pure-js.html`): Web Audio API AnalyserNode
+  - Pure JavaScript 버전 (`pure-js-fft`): Web Audio API AnalyserNode
   - 사용자가 직접 성능 비교 가능
 
 - **실시간 성능 모니터링**
@@ -242,7 +225,7 @@ npm run clean
 
 ### 테스트 환경
 
-- **CPU**: Apple M3
+- **CPU**: Apple M4
 - **브라우저**: Chrome 141
 - **오디오 파일**: WAV, 44.1kHz, Stereo
 - **FFT 크기**: 2048
@@ -253,7 +236,6 @@ npm run clean
 | 측정 항목         | WASM (C++) | Pure JavaScript FFT | 비고                                                                           |
 | ----------------- | ---------- | ------------------- | ------------------------------------------------------------------------------ |
 | **FFT 처리 시간** | ~0.33ms    | ~0.047ms            | Pure JS FFT가 약 7배 빠름                                                      |
-| **프레임 시간**   | ~0.24ms    | ~0.40ms             | WASM이 약간 빠름                                                               |
 | **렌더링 FPS**    | 120 FPS    | 120 FPS             | 양쪽 모두 한 프레임당 작업시간이 8.3ms 이내로 처리되기 때문에 최고 프레임 유지 |
 | **메모리 사용량** | ~139MB     | ~11MB               | Pure JS가 매우 메모리 효율적                                                   |
 
@@ -286,31 +268,6 @@ Pure JavaScript FFT 구현이 WASM C++ FFT 구현보다 약 7배 빠른 성능�
    - Twiddle factor (회전 인자) 사전 계산
    - 반복적인 삼각함수 계산 완전 제거
 
-#### 각 구현의 장단점
-
-**Pure JavaScript FFT:**
-
-- ✅ 매우 빠른 FFT 처리 속도 (~0.047ms)
-- ✅ 매우 낮은 메모리 사용량 (~11MB)
-- ✅ 빠른 오디오 로딩 (~4ms)
-- ✅ 간단한 구현과 디버깅
-- ❌ 브라우저 JIT 성능에 따라 변동 가능
-
-**WASM C++ FFT:**
-
-- ✅ 안정적이고 예측 가능한 성능
-- ✅ 더 빠른 전체 프레임 처리 시간
-- ✅ 복잡한 DSP 알고리즘 통합 가능
-- ❌ 더 많은 메모리 사용 (~139MB)
-- ❌ WASM 오버헤드로 인한 FFT 처리 시간 증가
-
-### 참고 문서
-
-자세한 성능 분석 및 최적화 방법은 다음 문서를 참조하세요:
-
-- [PERFORMANCE.md](PERFORMANCE.md) - WASM vs Web Audio API 성능 비교 분석
-- [ARCHITECTURE.md](ARCHITECTURE.md) - 시스템 아키텍처 및 데이터 흐름 (한국어)
-
 ---
 
 ## 프로젝트 구조
@@ -322,9 +279,6 @@ wasm-audio-visualizer/
 │   │   ├── core/               # 오디오 처리 핵심
 │   │   │   ├── audio_decoder.cpp      # WAV 디코더
 │   │   │   ├── audio_analyzer.cpp     # FFT 분석
-│   │   │   └── audio_buffer.cpp       # 순환 버퍼
-│   │   ├── utils/
-│   │   │   └── memory_pool.cpp        # 메모리 풀
 │   │   └── bindings/
 │   │       └── wasm_api.cpp           # WASM API
 │   ├── web/                    # 웹 프론트엔드
