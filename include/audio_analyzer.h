@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <complex>
 #include <cstdint>
 #include <memory>
 
