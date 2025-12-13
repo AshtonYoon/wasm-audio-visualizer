@@ -36,8 +36,6 @@ Emscripten을 사용하여 C++ 코드를 WebAssembly로 컴파일하고, cooley-
    - `-msimd128` 플래그를 통한 WebAssembly SIMD 128-bit 명령어 활용
    - **SIMD 사용 코드 위치:**
      - `CMakeLists.txt:29-30, 35` - 컴파일 플래그 설정
-     - `audio_analyzer.cpp:17-39` - `apply_window_simd()` - 4개 float 동시 처리 (윈도우 함수 적용)
-     - `audio_analyzer.cpp:45-81` - `compute_magnitude_simd()` - 4개 복소수 동시 처리 (크기 계산)
 
 3. **인터랙티브 컨트롤**
 
