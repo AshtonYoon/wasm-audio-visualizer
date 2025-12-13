@@ -170,7 +170,7 @@ npm run clean
   - 주파수 스펙트럼 분석
 - 오디오 디코더 (audio_decoder.cpp)
   - WAV 파일 파싱 및 디코딩
-  - PCM 데이터 추출
+
 
 ## 5. 개발 중 어려웠던 점과 해결 방법
 
