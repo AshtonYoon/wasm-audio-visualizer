@@ -177,10 +177,9 @@ npm run clean
 
 **어려웠던 점:**
 
-- Emscripten 툴체인 설치 및 환경 설정의 복잡성
-  - emsdk 설치 경로 및 환경 변수 설정
+- Emscripten 툴체인 설치 및 환경 변수 설정
 - CMake 빌드 시스템과 Emscripten의 통합
-  - 생소한 빌드 스크립트 작성 방법
+  - CmakeLists.txt와 build.sh 쉘 스크립트를 이용한 생소한 빌드 스크립트 작성 방법
 
 ### 5.2 WASM ↔ JavaScript 데이터 전달
 
