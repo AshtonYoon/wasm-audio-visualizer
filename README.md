@@ -166,7 +166,6 @@ npm run clean
 주요 구현 내용:
 
 - FFT 분석 엔진 (audio_analyzer.cpp)
-  - SIMD 최적화 적용
   - 주파수 스펙트럼 분석
 - 오디오 디코더 (audio_decoder.cpp)
   - WAV 파일 파싱 및 디코딩
